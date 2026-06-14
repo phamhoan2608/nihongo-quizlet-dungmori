@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "@/lib/types";
 import { shuffle } from "@/lib/shuffle";
 import { grade } from "@/lib/storage";
-import { kanaToRomaji, cleanReading } from "@/lib/romaji";
+import { cleanReading } from "@/lib/romaji";
 import Speaker from "./Speaker";
 import Seal from "./Seal";
 
-type AnswerMode = "meaning" | "romaji";
+type AnswerMode = "meaning" | "kana";
 
 function normalize(s: string): string {
   return s
@@ -28,9 +28,10 @@ function isMeaningMatch(input: string, meaning: string): boolean {
   return want.some((w) => w === got || w.includes(got) || got.includes(w));
 }
 
-function isRomajiMatch(input: string, reading: string): boolean {
-  const want = normalize(kanaToRomaji(cleanReading(reading)));
-  const got = normalize(input);
+// Exact kana match (hiragana or katakana typed directly).
+function isKanaMatch(input: string, reading: string): boolean {
+  const want = cleanReading(reading).trim();
+  const got = input.trim();
   if (!got || !want) return false;
   return got === want;
 }
@@ -62,8 +63,8 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
   const check = () => {
     if (state !== "idle" || !value.trim()) return;
     const ok =
-      answerMode === "romaji"
-        ? isRomajiMatch(value, card.reading || card.word)
+      answerMode === "kana"
+        ? isKanaMatch(value, card.reading || card.word)
         : isMeaningMatch(value, card.meaning);
     setState(ok ? "right" : "wrong");
     if (ok) setScore((s) => s + 1);
@@ -112,8 +113,8 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
   }
 
   const correctAnswer =
-    answerMode === "romaji"
-      ? kanaToRomaji(cleanReading(card?.reading || card?.word || ""))
+    answerMode === "kana"
+      ? cleanReading(card?.reading || card?.word || "")
       : card?.meaning ?? "";
 
   return (
@@ -130,7 +131,7 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
 
       {/* Answer mode toggle */}
       <div className="mb-3 flex rounded-xl border border-line bg-card p-1">
-        {(["meaning", "romaji"] as AnswerMode[]).map((m) => (
+        {(["meaning", "kana"] as AnswerMode[]).map((m) => (
           <button
             key={m}
             onClick={() => setAnswerMode(m)}
@@ -140,22 +141,25 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
                 : "text-sub hover:text-ink"
             }`}
           >
-            {m === "meaning" ? "Nghĩa tiếng Việt" : "Romaji"}
+            {m === "meaning" ? "Gõ tiếng Việt" : "Gõ kana"}
           </button>
         ))}
       </div>
 
+      {/* Card — hiển thị theo chiều ngược nhau tùy mode */}
       <div className="relative mb-3 flex flex-col items-center rounded-3xl border border-line bg-card px-6 py-5 shadow-card">
-        <Speaker text={card.reading || card.word} className="absolute right-4 top-4" />
-        <p className="font-jp text-5xl font-bold text-ink">{card.reading || card.word}</p>
-        {card.reading !== card.word && (
-          <p className="mt-2 font-jp text-base text-sub/60">{card.word}</p>
-        )}
-        {/* Show romaji hint only in meaning mode (in romaji mode it's the answer) */}
-        {answerMode === "meaning" && (
-          <p className="mt-1 text-sm tracking-wide text-sub/50">
-            {kanaToRomaji(cleanReading(card.reading || card.word))}
-          </p>
+        {answerMode === "meaning" ? (
+          <>
+            <Speaker text={card.reading || card.word} className="absolute right-4 top-4" />
+            <p className="font-jp text-5xl font-bold text-ink">{card.reading || card.word}</p>
+            {card.reading !== card.word && (
+              <p className="mt-2 font-jp text-base text-sub/60">{card.word}</p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-2xl font-semibold text-ink">{card.meaning}</p>
+          </>
         )}
         {state === "right" && (
           <span className="absolute -right-2 -top-2">
@@ -165,7 +169,7 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
       </div>
 
       <p className="mb-1.5 text-sm text-sub">
-        {answerMode === "romaji" ? "Gõ romaji của cách đọc:" : "Gõ nghĩa tiếng Việt:"}
+        {answerMode === "kana" ? "Gõ cách đọc bằng kana:" : "Gõ nghĩa tiếng Việt:"}
       </p>
       <input
         ref={inputRef}
@@ -176,11 +180,11 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
         }}
         disabled={state !== "idle"}
         placeholder={
-          answerMode === "romaji"
-            ? "Nhập romaji rồi nhấn Enter"
+          answerMode === "kana"
+            ? "Nhập hiragana / katakana rồi nhấn Enter"
             : "Nhập đáp án rồi nhấn Enter"
         }
-        className={`w-full rounded-xl border-2 bg-card px-4 py-3.5 text-lg outline-none transition ${
+        className={`w-full rounded-xl border-2 bg-card px-4 py-3.5 font-jp text-lg outline-none transition ${
           state === "right"
             ? "border-moss text-moss"
             : state === "wrong"
