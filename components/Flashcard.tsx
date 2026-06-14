@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { Card } from "@/lib/types";
 import type { MemoryLevelInfo } from "@/lib/storage";
 import { kanaToRomaji } from "@/lib/romaji";
@@ -52,11 +53,9 @@ export default function Flashcard({
 
             {/* Image */}
             {card.image && (
-              <img
-                src={card.image}
-                alt={primary}
-                className="mb-3 h-20 w-32 rounded-xl object-cover opacity-90 sm:h-24 sm:w-36"
-              />
+              <div className="relative mb-3 h-20 w-32 overflow-hidden rounded-xl opacity-90 sm:h-24 sm:w-36">
+                <Image src={card.image} alt={primary} fill className="object-cover" sizes="144px" />
+              </div>
             )}
 
             {/* Kana — primary */}
@@ -80,11 +79,9 @@ export default function Flashcard({
           {/* Back */}
           <div className="flip-face flip-back absolute inset-0 flex flex-col items-center justify-center rounded-3xl border border-indigo bg-indigo px-6 text-center shadow-lift">
             {card.image && (
-              <img
-                src={card.image}
-                alt={primary}
-                className="mb-2 h-16 w-28 rounded-xl object-cover opacity-80 sm:h-20 sm:w-32"
-              />
+              <div className="relative mb-2 h-16 w-28 overflow-hidden rounded-xl opacity-80 sm:h-20 sm:w-32">
+                <Image src={card.image} alt={primary} fill className="object-cover" sizes="128px" />
+              </div>
             )}
             <p className="font-jp text-2xl font-medium text-white/80">{primary}</p>
             {secondary && (

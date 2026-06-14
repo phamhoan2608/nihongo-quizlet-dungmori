@@ -1,50 +1,87 @@
 /**
- * Auto-fetch vocabulary images from Pixabay free API.
+ * Auto-fetch vocabulary images from Pixabay (free API).
+ * Uses Jisho.org (free, no key) to get English meanings from Japanese words,
+ * then searches Pixabay with the English keyword for accurate results.
  *
  * Usage:
- *   node scripts/fetch-images.mjs --key=YOUR_PIXABAY_KEY
+ *   node scripts/fetch-images.mjs --key=YOUR_PIXABAY_KEY [--reset]
  *
- * Get a free API key at: https://pixabay.com/api/docs/
- * (Register → My Account → API key)
+ * --reset  : clear existing images.json and re-fetch everything
  *
- * Results are saved to data/images.json as { "cardId": "imageUrl", ... }
- * Run again any time to fill in missing entries without re-fetching existing ones.
+ * Get a free Pixabay key at: https://pixabay.com/api/docs/
  */
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execSync } from "child_process";
+
+/** HTTP GET via curl (more reliable than Node fetch in restricted envs). */
+function curlGet(url) {
+  try {
+    const out = execSync(`curl -s --max-time 15 "${url}"`, { encoding: "utf-8" });
+    return JSON.parse(out);
+  } catch {
+    return null;
+  }
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
-// ── Parse args ──────────────────────────────────────────────────────────────
+// ── Args ─────────────────────────────────────────────────────────────────────
 const apiKey = process.argv.find((a) => a.startsWith("--key="))?.slice(6);
+const reset  = process.argv.includes("--reset");
+
 if (!apiKey) {
-  console.error("Usage: node scripts/fetch-images.mjs --key=YOUR_PIXABAY_KEY");
+  console.error("Usage: node scripts/fetch-images.mjs --key=YOUR_PIXABAY_KEY [--reset]");
   process.exit(1);
 }
 
-// ── Load data ────────────────────────────────────────────────────────────────
+// ── Load data ─────────────────────────────────────────────────────────────────
 const n5 = JSON.parse(fs.readFileSync(path.join(ROOT, "data/n5.json"), "utf-8"));
 const imagesPath = path.join(ROOT, "data/images.json");
-const existing = fs.existsSync(imagesPath)
+
+const existing = (!reset && fs.existsSync(imagesPath))
   ? JSON.parse(fs.readFileSync(imagesPath, "utf-8"))
   : {};
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+if (reset) console.log("--reset: clearing existing images.\n");
 
-/** Extract a clean keyword from Vietnamese meaning for image search. */
-function extractKeyword(meaning) {
-  return meaning
-    .split(/[,，;；/、]/)[0]          // take first alternative
-    .replace(/[（(][^）)]*[）)]/g, "") // strip parentheses
-    .replace(/[~～。・]/g, " ")
-    .trim();
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Fetch best image URL from Pixabay for a keyword. Returns null if not found. */
-async function fetchImage(keyword) {
+/** Strip Japanese prefix/suffix markers before looking up. */
+function cleanWord(w) {
+  return w
+    .replace(/[～~]/g, "")
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .replace(/[、。]/g, " ")
+    .trim()
+    .split(/\s+/)[0]; // take first word if multiple
+}
+
+/**
+ * Look up Japanese word on Jisho and return the first English definition.
+ * Returns null if not found.
+ */
+function getEnglishFromJisho(word) {
+  const q = cleanWord(word);
+  if (!q) return null;
+  const url = `https://jisho.org/api/v1/search/words?keyword=${encodeURIComponent(q)}`;
+  const data = curlGet(url);
+  const defs = data?.data?.[0]?.senses?.[0]?.english_definitions;
+  return defs?.[0] ?? null;
+}
+
+/**
+ * Fetch a relevant image URL from Pixabay for the given English keyword.
+ * Returns null if nothing found.
+ */
+function fetchPixabayImage(keyword) {
   const params = new URLSearchParams({
     key: apiKey,
     q: keyword,
@@ -53,48 +90,56 @@ async function fetchImage(keyword) {
     per_page: "5",
     min_width: "300",
   });
-  const url = `https://pixabay.com/api/?${params}`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    // Prefer landscape photos with good resolution
-    const hit = data.hits?.find((h) => h.imageWidth >= h.imageHeight) ?? data.hits?.[0];
-    return hit?.webformatURL ?? null;
-  } catch (err) {
-    console.error(`  ✗ fetch error for "${keyword}": ${err.message}`);
-    return null;
-  }
+  const data = curlGet(`https://pixabay.com/api/?${params}`);
+  if (!data) return null;
+  const hit = data.hits?.find((h) => h.imageWidth >= h.imageHeight) ?? data.hits?.[0];
+  return hit?.webformatURL ?? null;
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 const result = { ...existing };
-const cards = n5.filter((c) => !result[String(c.id)]); // skip already-fetched
+const todo = n5.filter((c) => !result[String(c.id)]);
 
-console.log(`Found ${n5.length} cards, ${cards.length} need images.\n`);
+console.log(`${n5.length} cards total, ${todo.length} need images.\n`);
 
-let fetched = 0;
-let skipped = 0;
+let fetched = 0, noEn = 0, noImg = 0;
 
-for (const card of cards) {
-  const keyword = extractKeyword(card.meaning);
-  process.stdout.write(`[${card.id}] "${card.reading || card.word}" → "${keyword}" … `);
+for (const card of todo) {
+  const jp = cleanWord(card.reading || card.word);
+  process.stdout.write(`[${card.id}] ${jp} … `);
 
-  const imageUrl = await fetchImage(keyword);
+  // Step 1: Japanese → English via Jisho
+  const english = getEnglishFromJisho(jp);
+  sleep(400); // be polite to Jisho
+
+  if (!english) {
+    noEn++;
+    console.log("— no English found");
+    continue;
+  }
+
+  process.stdout.write(`"${english}" → `);
+
+  // Step 2: English → image via Pixabay
+  const imageUrl = fetchPixabayImage(english);
+  sleep(650); // Pixabay free: 100 req/min
+
   if (imageUrl) {
     result[String(card.id)] = imageUrl;
     fetched++;
     console.log("✓");
   } else {
-    skipped++;
-    console.log("— no result");
+    noImg++;
+    console.log("— no image");
   }
 
-  // Pixabay free tier: 100 requests/min → ~600ms gap is safe
-  await new Promise((r) => setTimeout(r, 650));
+  // Save incrementally every 20 words in case of interruption
+  if ((fetched + noEn + noImg) % 20 === 0) {
+    fs.writeFileSync(imagesPath, JSON.stringify(result, null, 2) + "\n");
+  }
 }
 
-// ── Save ─────────────────────────────────────────────────────────────────────
+// ── Final save ────────────────────────────────────────────────────────────────
 fs.writeFileSync(imagesPath, JSON.stringify(result, null, 2) + "\n");
-console.log(`\nDone. Fetched: ${fetched}, skipped: ${skipped}.`);
-console.log(`Saved to data/images.json (${Object.keys(result).length} total entries).`);
+console.log(`\nDone. ✓ ${fetched} images  — ${noEn} no EN translation  — ${noImg} no image`);
+console.log(`Saved to data/images.json (${Object.keys(result).length} total).`);

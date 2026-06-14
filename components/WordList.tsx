@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import type { Card } from "@/lib/types";
 import {
   getProgress,
@@ -53,11 +54,9 @@ export default function WordList({ cards }: { cards: Card[] }) {
 
               {/* Thumbnail */}
               {card.image && (
-                <img
-                  src={card.image}
-                  alt={card.reading || card.word}
-                  className="h-8 w-10 shrink-0 rounded-md object-cover"
-                />
+                <div className="relative h-8 w-10 shrink-0 overflow-hidden rounded-md">
+                  <Image src={card.image} alt={card.reading || card.word} fill className="object-cover" sizes="40px" />
+                </div>
               )}
 
               {/* Word */}
