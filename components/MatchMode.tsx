@@ -109,14 +109,11 @@ export default function MatchMode({ cards }: { cards: Card[] }) {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between text-sm text-sub">
-        <span>
-          Đã nối {matched.size}/{total}
-        </span>
-        <span>{elapsed}s</span>
+      <div className="mb-2 flex items-center justify-between text-sm text-sub">
+        <span>Đã nối {matched.size}/{total}</span>
+        <span>{elapsed}s · Chạm từ tiếng Nhật rồi chạm nghĩa</span>
       </div>
-      <p className="mb-5 text-sm text-sub">Chạm 1 từ tiếng Nhật rồi chạm nghĩa tương ứng.</p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {tiles.map((tile) => {
           const isMatched = matched.has(tile.cardId);
           const isSel = sel?.key === tile.key;
@@ -131,7 +128,7 @@ export default function MatchMode({ cards }: { cards: Card[] }) {
               key={tile.key}
               onClick={() => onTile(tile)}
               disabled={isMatched}
-              className={`flex min-h-[5rem] items-center justify-center rounded-2xl border-2 p-3 text-center text-sm font-medium transition ${cls} ${
+              className={`flex min-h-[4rem] items-center justify-center rounded-2xl border-2 p-2 text-center text-sm font-medium transition ${cls} ${
                 tile.side === "word" ? "font-jp text-lg" : ""
               }`}
             >

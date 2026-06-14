@@ -157,7 +157,7 @@ export default function FlashcardMode({ cards }: { cards: Card[] }) {
   return (
     <div>
       {/* Counter + nav */}
-      <div className="mb-4 flex items-center gap-3 text-sm text-sub">
+      <div className="mb-3 flex items-center gap-3 text-sm text-sub">
         <button
           onClick={goPrev}
           disabled={i === 0}
@@ -192,7 +192,7 @@ export default function FlashcardMode({ cards }: { cards: Card[] }) {
       </div>
 
       {/* Progress bar */}
-      <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-line">
+      <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-line">
         <div className="h-full bg-indigo transition-all" style={{ width: `${progress}%` }} />
       </div>
 
@@ -204,7 +204,7 @@ export default function FlashcardMode({ cards }: { cards: Card[] }) {
       />
 
       {/* Action buttons */}
-      <div className="mt-6">
+      <div className="mt-4">
         {flipped ? (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -221,7 +221,7 @@ export default function FlashcardMode({ cards }: { cards: Card[] }) {
             </div>
             <button
               onClick={handleMastered}
-              className="mt-3 w-full rounded-xl bg-moss py-3 text-sm font-semibold text-white transition hover:opacity-90"
+              className="mt-2 w-full rounded-xl bg-moss py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
             >
               Tôi đã thuộc từ này ✓
               <span className="ml-1.5 text-xs font-normal opacity-60">[5]</span>
@@ -238,7 +238,7 @@ export default function FlashcardMode({ cards }: { cards: Card[] }) {
       </div>
 
       {/* Keyboard hints */}
-      <p className="mt-3 text-center text-xs text-sub/50">
+      <p className="mt-2 text-center text-xs text-sub/50">
         ← → điều hướng · Space lật · Enter tiếp · 1–4 đánh giá · 5 đã thuộc
       </p>
     </div>

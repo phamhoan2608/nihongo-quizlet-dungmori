@@ -90,17 +90,17 @@ export default function QuizMode({ cards }: { cards: Card[] }) {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between text-sm text-sub">
+      <div className="mb-3 flex items-center justify-between text-sm text-sub">
         <span>
           Câu {i + 1} / {qs.length}
         </span>
         <span>Đúng {score}</span>
       </div>
-      <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-line">
+      <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-line">
         <div className="h-full bg-indigo transition-all" style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="relative mb-6 flex flex-col items-center rounded-3xl border border-line bg-card px-6 py-10 shadow-card">
+      <div className="relative mb-4 flex flex-col items-center rounded-3xl border border-line bg-card px-6 py-6 shadow-card">
         <Speaker text={q.card.reading || q.card.word} className="absolute right-4 top-4" />
         <p className="font-jp text-5xl font-bold text-ink">{q.card.reading || q.card.word}</p>
         {q.card.reading !== q.card.word && (
@@ -139,7 +139,7 @@ export default function QuizMode({ cards }: { cards: Card[] }) {
       {picked && (
         <button
           onClick={next}
-          className="mt-6 w-full animate-slide-up rounded-xl bg-ink py-3.5 font-semibold text-white transition hover:opacity-90"
+          className="mt-3 w-full animate-slide-up rounded-xl bg-ink py-3 font-semibold text-white transition hover:opacity-90"
         >
           {i + 1 === qs.length ? "Xem kết quả" : "Câu tiếp theo"}
         </button>

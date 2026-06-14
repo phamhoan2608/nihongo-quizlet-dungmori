@@ -32,7 +32,7 @@ export default function Flashcard({
         className="block w-full cursor-pointer text-left outline-none"
       >
         <div
-          className={`flip-inner relative h-72 w-full sm:h-80 ${
+          className={`flip-inner relative h-52 w-full sm:h-60 ${
             flipped ? "is-flipped" : ""
           }`}
         >

@@ -118,18 +118,18 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between text-sm text-sub">
+      <div className="mb-2 flex items-center justify-between text-sm text-sub">
         <span>
           {i + 1} / {deck.length}
         </span>
         <span>Đúng {score}</span>
       </div>
-      <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-line">
+      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-line">
         <div className="h-full bg-indigo transition-all" style={{ width: `${progress}%` }} />
       </div>
 
       {/* Answer mode toggle */}
-      <div className="mb-5 flex rounded-xl border border-line bg-card p-1">
+      <div className="mb-3 flex rounded-xl border border-line bg-card p-1">
         {(["meaning", "romaji"] as AnswerMode[]).map((m) => (
           <button
             key={m}
@@ -145,7 +145,7 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
         ))}
       </div>
 
-      <div className="relative mb-6 flex flex-col items-center rounded-3xl border border-line bg-card px-6 py-10 shadow-card">
+      <div className="relative mb-3 flex flex-col items-center rounded-3xl border border-line bg-card px-6 py-5 shadow-card">
         <Speaker text={card.reading || card.word} className="absolute right-4 top-4" />
         <p className="font-jp text-5xl font-bold text-ink">{card.reading || card.word}</p>
         {card.reading !== card.word && (
@@ -164,7 +164,7 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
         )}
       </div>
 
-      <p className="mb-2 text-sm text-sub">
+      <p className="mb-1.5 text-sm text-sub">
         {answerMode === "romaji" ? "Gõ romaji của cách đọc:" : "Gõ nghĩa tiếng Việt:"}
       </p>
       <input
@@ -198,7 +198,7 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
       <button
         onClick={state === "idle" ? check : next}
         disabled={state === "idle" && !value.trim()}
-        className="mt-5 w-full rounded-xl bg-indigo py-3.5 font-semibold text-white transition hover:bg-indigo-deep disabled:opacity-40"
+        className="mt-3 w-full rounded-xl bg-indigo py-3 font-semibold text-white transition hover:bg-indigo-deep disabled:opacity-40"
       >
         {state === "idle" ? "Kiểm tra" : i + 1 === deck.length ? "Xem kết quả" : "Tiếp theo"}
       </button>
