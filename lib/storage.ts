@@ -1,0 +1,165 @@
+import type { CardProgress, Grade, GradeSource } from "./types";
+
+const KEY = "minna-srs-v1";
+
+type Store = Record<number, CardProgress>;
+
+function read(): Store {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function write(s: Store): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEY, JSON.stringify(s));
+}
+
+const DAY = 86_400_000;
+
+// Box caps per source:
+//   flashcard  → max box 2 ("Đang ôn") — recognition only, not real recall
+//   exercise   → max box 4 ("Thuộc")   — requires active recall
+//   markMastered() → box 5 ("Thành thạo") — explicit user confirmation only
+const BOX_CAP: Record<GradeSource, number> = {
+  flashcard: 2,
+  exercise: 4,
+};
+
+function fresh(): CardProgress {
+  return {
+    box: 0,
+    ease: 2.5,
+    interval: 0,
+    due: 0,
+    reps: 0,
+    correct: 0,
+    wrong: 0,
+    lastSeen: 0,
+  };
+}
+
+/**
+ * Decay the box when the card is overdue.
+ * Uses a log₂ curve: each doubling of (overdueDays / interval) costs one box.
+ *   ratio 0–1  → decay 0
+ *   ratio 1–3  → decay 1
+ *   ratio 3–7  → decay 2
+ *   ratio 7–15 → decay 3  … and so on.
+ */
+export function effectiveBox(p: CardProgress): number {
+  if (p.reps === 0 || p.box <= 0 || p.interval <= 0) return p.box;
+  const now = Date.now();
+  if (now <= p.due) return p.box;
+  const overdueRatio = (now - p.due) / (p.interval * DAY);
+  const decay = Math.floor(Math.log2(overdueRatio + 1));
+  return Math.max(0, p.box - decay);
+}
+
+/**
+ * Named memory levels matching the 6 Leitner boxes (0–5).
+ * Box 0–2 reachable via flashcard. Box 3–4 via exercises. Box 5 via explicit confirmation.
+ */
+export const MEMORY_LEVELS = [
+  { label: "Mới",         cls: "bg-line text-sub"           },
+  { label: "Nhìn quen",  cls: "bg-shu-soft text-shu"       },
+  { label: "Đang ôn",    cls: "bg-indigo-soft text-indigo" },
+  { label: "Nhớ khá",   cls: "bg-indigo text-white"       },
+  { label: "Thuộc",     cls: "bg-moss/10 text-moss"       },
+  { label: "Thành thạo", cls: "bg-moss text-white"         },
+] as const;
+
+export type MemoryLevelInfo = (typeof MEMORY_LEVELS)[number];
+
+export function getMemoryLevel(p: CardProgress): MemoryLevelInfo {
+  if (p.reps === 0) return MEMORY_LEVELS[0];
+  const box = effectiveBox(p);
+  return MEMORY_LEVELS[Math.min(box, MEMORY_LEVELS.length - 1)];
+}
+
+export function getProgress(id: number): CardProgress {
+  return read()[id] ?? fresh();
+}
+
+export function getAllProgress(): Store {
+  return read();
+}
+
+/**
+ * Grade a card after a study session.
+ * source="flashcard" caps box at 2 (recognition only).
+ * source="exercise"  caps box at 4 (active recall).
+ * Box 5 is only reachable via markMastered().
+ */
+export function grade(id: number, g: Grade, source: GradeSource = "exercise"): CardProgress {
+  const store = read();
+  const p = store[id] ?? fresh();
+  const now = Date.now();
+  p.reps++;
+  p.lastSeen = now;
+
+  // Apply decay so a long absence takes effect immediately.
+  p.box = effectiveBox(p);
+
+  const cap = BOX_CAP[source];
+
+  if (g === "again") {
+    p.wrong++;
+    p.box = Math.max(0, p.box - 1);
+    p.ease = Math.max(1.3, p.ease - 0.2);
+    p.interval = 0;
+  } else {
+    p.correct++;
+    p.box = Math.min(cap, p.box + (g === "easy" ? 2 : 1));
+    if (g === "hard") p.ease = Math.max(1.3, p.ease - 0.15);
+    if (g === "easy") p.ease += 0.15;
+    if (p.interval === 0) p.interval = g === "easy" ? 3 : 1;
+    else p.interval = Math.round(p.interval * p.ease * (g === "hard" ? 0.6 : 1));
+  }
+  p.due = now + p.interval * DAY;
+  store[id] = p;
+  write(store);
+  return p;
+}
+
+/** User explicitly confirms they have mastered this word — sets box to 5. */
+export function markMastered(id: number): CardProgress {
+  const store = read();
+  const p = store[id] ?? fresh();
+  const now = Date.now();
+  p.box = 5;
+  p.ease = Math.max(p.ease, 2.5);
+  p.interval = 60; // review again in ~2 months
+  p.due = now + p.interval * DAY;
+  p.lastSeen = now;
+  if (p.reps === 0) { p.reps = 1; p.correct = 1; }
+  store[id] = p;
+  write(store);
+  return p;
+}
+
+export function resetLesson(ids: number[]): void {
+  const store = read();
+  for (const id of ids) delete store[id];
+  write(store);
+}
+
+export interface LessonStats {
+  seen: number;
+  mastered: number; // effectiveBox >= 4 (Thuộc or Thành thạo)
+}
+
+export function lessonStats(ids: number[]): LessonStats {
+  const store = read();
+  let seen = 0;
+  let mastered = 0;
+  for (const id of ids) {
+    const p = store[id];
+    if (p && p.reps > 0) seen++;
+    if (p && effectiveBox(p) >= 4) mastered++;
+  }
+  return { seen, mastered };
+}

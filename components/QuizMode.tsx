@@ -1,0 +1,149 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import type { Card } from "@/lib/types";
+import { shuffle, sample } from "@/lib/shuffle";
+import { grade } from "@/lib/storage";
+import Seal from "./Seal";
+import Speaker from "./Speaker";
+
+interface Q {
+  card: Card;
+  options: string[];
+}
+
+function buildQuestions(cards: Card[]): Q[] {
+  const pool = cards;
+  return shuffle(cards).map((card) => {
+    const distractors = sample(
+      pool.filter((c) => c.id !== card.id && c.meaning !== card.meaning),
+      3
+    ).map((c) => c.meaning);
+    return { card, options: shuffle([card.meaning, ...distractors]) };
+  });
+}
+
+export default function QuizMode({ cards }: { cards: Card[] }) {
+  const [qs, setQs] = useState<Q[]>([]);
+  const [i, setI] = useState(0);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [score, setScore] = useState(0);
+
+  useEffect(() => {
+    setQs(buildQuestions(cards));
+    setI(0);
+    setPicked(null);
+    setScore(0);
+  }, [cards]);
+
+  const q = qs[i];
+  const finished = qs.length > 0 && i >= qs.length;
+
+  const choose = (opt: string) => {
+    if (picked) return;
+    setPicked(opt);
+    const ok = opt === q.card.meaning;
+    if (ok) setScore((s) => s + 1);
+    grade(q.card.id, ok ? "good" : "again", "exercise");
+  };
+
+  const next = () => {
+    setPicked(null);
+    setI((x) => x + 1);
+  };
+
+  const restart = () => {
+    setQs(buildQuestions(cards));
+    setI(0);
+    setPicked(null);
+    setScore(0);
+  };
+
+  const progress = useMemo(
+    () => Math.round((i / Math.max(qs.length, 1)) * 100),
+    [i, qs.length]
+  );
+
+  if (qs.length === 0) return null;
+
+  if (finished) {
+    const pct = Math.round((score / qs.length) * 100);
+    return (
+      <div className="flex flex-col items-center rounded-3xl border border-line bg-card p-10 text-center shadow-card">
+        <p className="text-sm font-semibold uppercase tracking-widest text-sub">
+          Kết quả
+        </p>
+        <p className="mt-2 font-jp text-5xl font-bold text-indigo">
+          {score}
+          <span className="text-2xl text-sub">/{qs.length}</span>
+        </p>
+        <p className="mt-2 text-sub">Đúng {pct}%</p>
+        <button
+          onClick={restart}
+          className="mt-6 rounded-full bg-indigo px-6 py-2.5 font-semibold text-white transition hover:bg-indigo-deep"
+        >
+          Làm lại
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between text-sm text-sub">
+        <span>
+          Câu {i + 1} / {qs.length}
+        </span>
+        <span>Đúng {score}</span>
+      </div>
+      <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-line">
+        <div className="h-full bg-indigo transition-all" style={{ width: `${progress}%` }} />
+      </div>
+
+      <div className="relative mb-6 flex flex-col items-center rounded-3xl border border-line bg-card px-6 py-10 shadow-card">
+        <Speaker text={q.card.reading || q.card.word} className="absolute right-4 top-4" />
+        <p className="font-jp text-5xl font-bold text-ink">{q.card.reading || q.card.word}</p>
+        {q.card.reading !== q.card.word && (
+          <p className="mt-2 font-jp text-base text-sub/60">{q.card.word}</p>
+        )}
+        {picked && (
+          <span className="absolute -right-2 -top-2">
+            {picked === q.card.meaning ? <Seal /> : null}
+          </span>
+        )}
+      </div>
+
+      <div className="grid gap-3">
+        {q.options.map((opt) => {
+          const isCorrect = opt === q.card.meaning;
+          const isPicked = opt === picked;
+          let cls = "border-line bg-card hover:border-indigo hover:bg-indigo-soft";
+          if (picked) {
+            if (isCorrect) cls = "border-moss bg-moss/10 text-moss";
+            else if (isPicked) cls = "border-shu bg-shu-soft text-shu";
+            else cls = "border-line bg-card opacity-60";
+          }
+          return (
+            <button
+              key={opt}
+              onClick={() => choose(opt)}
+              disabled={!!picked}
+              className={`rounded-xl border-2 px-5 py-3.5 text-left font-medium text-ink transition ${cls}`}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+
+      {picked && (
+        <button
+          onClick={next}
+          className="mt-6 w-full animate-slide-up rounded-xl bg-ink py-3.5 font-semibold text-white transition hover:opacity-90"
+        >
+          {i + 1 === qs.length ? "Xem kết quả" : "Câu tiếp theo"}
+        </button>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: #f6f5f1;
+  color: #1b1a20;
+}
+
+body {
+  font-feature-settings: "kern", "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 3D flip card */
+.flip {
+  perspective: 1600px;
+}
+.flip-inner {
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.flip-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+.flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-back {
+  transform: rotateY(180deg);
+}
+
+/* hanko-style seal */
+.seal {
+  font-family: "Zen Maru Gothic", sans-serif;
+}
+
+::selection {
+  background: #2c3a8c;
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner,
+  .flip-inner.is-flipped {
+    transition: none;
+  }
+  * {
+    animation-duration: 0.001ms !important;
+  }
+}
