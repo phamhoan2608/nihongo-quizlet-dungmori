@@ -11,6 +11,7 @@ export interface Card {
   pos: string;
   meaning: string;
   note: string;
+  image?: string;   // URL from data/images.json, merged at load time
 }
 
 export type Grade = "again" | "hard" | "good" | "easy";

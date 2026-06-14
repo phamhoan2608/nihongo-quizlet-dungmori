@@ -50,8 +50,19 @@ export default function Flashcard({
             </div>
             <Speaker text={primary} className="absolute right-4 top-4" />
 
+            {/* Image */}
+            {card.image && (
+              <img
+                src={card.image}
+                alt={primary}
+                className="mb-3 h-20 w-32 rounded-xl object-cover opacity-90 sm:h-24 sm:w-36"
+              />
+            )}
+
             {/* Kana — primary */}
-            <p className="font-jp text-5xl font-bold text-ink sm:text-6xl">{primary}</p>
+            <p className={`font-jp font-bold text-ink ${card.image ? "text-4xl sm:text-5xl" : "text-5xl sm:text-6xl"}`}>
+              {primary}
+            </p>
 
             {/* Kanji — secondary reference */}
             {secondary && (
@@ -68,15 +79,22 @@ export default function Flashcard({
 
           {/* Back */}
           <div className="flip-face flip-back absolute inset-0 flex flex-col items-center justify-center rounded-3xl border border-indigo bg-indigo px-6 text-center shadow-lift">
+            {card.image && (
+              <img
+                src={card.image}
+                alt={primary}
+                className="mb-2 h-16 w-28 rounded-xl object-cover opacity-80 sm:h-20 sm:w-32"
+              />
+            )}
             <p className="font-jp text-2xl font-medium text-white/80">{primary}</p>
             {secondary && (
               <p className="font-jp text-sm text-white/50">{secondary}</p>
             )}
-            <p className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
+            <p className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
               {card.meaning}
             </p>
             {card.note && (
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-white/70">
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-white/70">
                 {card.note}
               </p>
             )}

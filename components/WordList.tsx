@@ -51,6 +51,15 @@ export default function WordList({ cards }: { cards: Card[] }) {
                 {imp ? "★" : "☆"}
               </button>
 
+              {/* Thumbnail */}
+              {card.image && (
+                <img
+                  src={card.image}
+                  alt={card.reading || card.word}
+                  className="h-8 w-10 shrink-0 rounded-md object-cover"
+                />
+              )}
+
               {/* Word */}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-jp text-sm font-semibold text-ink">

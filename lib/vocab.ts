@@ -1,5 +1,8 @@
 import type { Card } from "./types";
 import n5raw from "@/data/n5.json";
+import imagesRaw from "@/data/images.json";
+
+const IMAGES = imagesRaw as Record<string, string>;
 
 // ── Data registry ─────────────────────────────────────────────────────────
 // To add a new course: import its JSON here and add an entry below.
@@ -24,7 +27,10 @@ export interface LessonInfo {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function courseCards(course: string): Card[] {
-  return (RAW[course] ?? []).map((c) => ({ ...c, course }) as Card);
+  return (RAW[course] ?? []).map((c) => {
+    const raw = c as { id: number };
+    return { ...c, course, image: IMAGES[String(raw.id)] } as Card;
+  });
 }
 
 // ── Public API ────────────────────────────────────────────────────────────
