@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Card } from "@/lib/types";
 import { shuffle, sample } from "@/lib/shuffle";
-import { grade } from "@/lib/storage";
+import { grade, prioritizeCards } from "@/lib/storage";
 import Seal from "./Seal";
 import Speaker from "./Speaker";
 
@@ -14,7 +14,7 @@ interface Q {
 
 function buildQuestions(cards: Card[]): Q[] {
   const pool = cards;
-  return shuffle(cards).map((card) => {
+  return prioritizeCards(cards).map((card) => {
     const distractors = sample(
       pool.filter((c) => c.id !== card.id && c.meaning !== card.meaning),
       3

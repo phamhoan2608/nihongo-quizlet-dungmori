@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Card } from "@/lib/types";
-import { shuffle, sample } from "@/lib/shuffle";
+import { shuffle } from "@/lib/shuffle";
 import { speak } from "@/lib/tts";
-import { grade } from "@/lib/storage";
+import { grade, prioritizeCards } from "@/lib/storage";
 
 type Side = "word" | "meaning";
 interface Tile {
@@ -17,7 +17,7 @@ interface Tile {
 const ROUND = 6;
 
 function buildTiles(cards: Card[]): Tile[] {
-  const chosen = sample(cards, Math.min(ROUND, cards.length));
+  const chosen = prioritizeCards(cards).slice(0, Math.min(ROUND, cards.length));
   const tiles: Tile[] = [];
   for (const c of chosen) {
     tiles.push({ key: `w${c.id}`, cardId: c.id, side: "word", text: c.reading || c.word });

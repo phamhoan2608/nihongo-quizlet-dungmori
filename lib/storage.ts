@@ -1,6 +1,8 @@
-import type { CardProgress, Grade, GradeSource } from "./types";
+import type { Card, CardProgress, Grade, GradeSource } from "./types";
+import { shuffle } from "./shuffle";
 
 const KEY = "minna-srs-v1";
+const IMPORTANT_KEY = "minna-important-v1";
 
 type Store = Record<number, CardProgress>;
 
@@ -162,4 +164,72 @@ export function lessonStats(ids: number[]): LessonStats {
     if (p && effectiveBox(p) >= 4) mastered++;
   }
   return { seen, mastered };
+}
+
+// ── Important words ────────────────────────────────────────────────────────
+
+function readImportant(): Set<number> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(IMPORTANT_KEY) || "[]") as number[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeImportant(s: Set<number>): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(IMPORTANT_KEY, JSON.stringify([...s]));
+}
+
+export function isImportant(id: number): boolean {
+  return readImportant().has(id);
+}
+
+/** Toggle the important flag. Returns the new state (true = important). */
+export function toggleImportant(id: number): boolean {
+  const s = readImportant();
+  if (s.has(id)) s.delete(id); else s.add(id);
+  writeImportant(s);
+  return s.has(id);
+}
+
+export function getAllImportant(): Set<number> {
+  return readImportant();
+}
+
+// ── Priority sort ──────────────────────────────────────────────────────────
+
+/**
+ * Return cards sorted for study: unseen first, then by effective box ascending,
+ * mastered last. Important cards get priority within each group.
+ * Within each priority bucket the order is shuffled for variety.
+ */
+export function prioritizeCards(cards: Card[]): Card[] {
+  const store = read();
+  const important = readImportant();
+
+  // priority score: lower = study first
+  // boxGroup: 0=unseen, 1=box1-2, 2=box3-4, 3=mastered(5)
+  // impOffset: 0=important, 1=regular
+  const score = (card: Card): number => {
+    const p = store[card.id];
+    const box = p && p.reps > 0 ? effectiveBox(p) : -1;
+    const boxGroup = box < 0 ? 0 : box <= 2 ? 1 : box <= 4 ? 2 : 3;
+    const impOffset = important.has(card.id) ? 0 : 1;
+    return boxGroup * 2 + impOffset;
+  };
+
+  const buckets = new Map<number, Card[]>();
+  for (const card of cards) {
+    const s = score(card);
+    if (!buckets.has(s)) buckets.set(s, []);
+    buckets.get(s)!.push(card);
+  }
+
+  const result: Card[] = [];
+  for (const [, group] of [...buckets.entries()].sort((a, b) => a[0] - b[0])) {
+    result.push(...shuffle(group));
+  }
+  return result;
 }

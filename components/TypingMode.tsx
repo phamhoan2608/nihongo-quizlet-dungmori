@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "@/lib/types";
-import { shuffle } from "@/lib/shuffle";
-import { grade } from "@/lib/storage";
+import { grade, prioritizeCards } from "@/lib/storage";
 import { cleanReading } from "@/lib/romaji";
 import Speaker from "./Speaker";
 import Seal from "./Seal";
@@ -46,7 +45,7 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setDeck(shuffle(cards));
+    setDeck(prioritizeCards(cards));
     setI(0);
     setValue("");
     setState("idle");
@@ -78,7 +77,7 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
   };
 
   const restart = () => {
-    setDeck(shuffle(cards));
+    setDeck(prioritizeCards(cards));
     setI(0);
     setValue("");
     setState("idle");

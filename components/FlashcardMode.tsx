@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Card, Grade } from "@/lib/types";
 import { shuffle } from "@/lib/shuffle";
-import { grade, markMastered, getProgress, getMemoryLevel } from "@/lib/storage";
+import { grade, markMastered, getProgress, getMemoryLevel, prioritizeCards } from "@/lib/storage";
 import Flashcard from "./Flashcard";
 
 const GRADES: { g: Grade; label: string; hint: string; cls: string }[] = [
@@ -62,7 +62,7 @@ export default function FlashcardMode({ cards }: { cards: Card[] }) {
   }, [againCards]);
 
   const restart = useCallback(() => {
-    setDeck(shuffle(cards));
+    setDeck(prioritizeCards(cards));
     setI(0);
     setFlipped(false);
     setDone(0);
@@ -72,7 +72,7 @@ export default function FlashcardMode({ cards }: { cards: Card[] }) {
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
-    setDeck(shuffle(cards));
+    setDeck(prioritizeCards(cards));
     setI(0);
     setFlipped(false);
     setDone(0);
