@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Card, Mode } from "@/lib/types";
-import { resetLesson } from "@/lib/storage";
+import { resetLesson, getAutoPlay, setAutoPlay } from "@/lib/storage";
 import FlashcardMode from "./FlashcardMode";
 import QuizMode from "./QuizMode";
 import MatchMode from "./MatchMode";
@@ -30,6 +30,15 @@ export default function StudySession({
   const [section, setSection] = useState<string>("all");
   const [onlyVocab, setOnlyVocab] = useState(false);
   const [showWordList, setShowWordList] = useState(false);
+  const [autoPlay, setAutoPlayState] = useState(false);
+
+  useEffect(() => { setAutoPlayState(getAutoPlay()); }, []);
+
+  const toggleAutoPlay = () => {
+    const next = !autoPlay;
+    setAutoPlayState(next);
+    setAutoPlay(next);
+  };
 
   const sections = useMemo(
     () => [...new Set(cards.map((c) => c.section))].sort(),
@@ -58,18 +67,43 @@ export default function StudySession({
           <span className="font-jp text-xl font-bold text-ink">Bài {lesson}</span>
           <span className="truncate font-normal text-sub">· {filtered.length} thẻ</span>
         </Link>
-        <div className="flex shrink-0 items-center gap-3">
-          {/* Word list toggle — visible on mobile only */}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Auto-play toggle */}
           <button
-            onClick={() => setShowWordList((v) => !v)}
-            className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition lg:hidden ${
-              showWordList
+            onClick={toggleAutoPlay}
+            title={autoPlay ? "Tắt tự động phát âm" : "Bật tự động phát âm"}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
+              autoPlay
                 ? "border-indigo bg-indigo-soft text-indigo"
                 : "border-line text-sub"
             }`}
           >
+            {autoPlay ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              </svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <line x1="23" y1="9" x2="17" y2="15" />
+                <line x1="17" y1="9" x2="23" y2="15" />
+              </svg>
+            )}
+            <span className="hidden sm:inline">{autoPlay ? "Tự phát âm" : "Tự phát âm"}</span>
+          </button>
+
+          {/* Word list toggle — mobile only */}
+          <button
+            onClick={() => setShowWordList((v) => !v)}
+            className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition lg:hidden ${
+              showWordList ? "border-indigo bg-indigo-soft text-indigo" : "border-line text-sub"
+            }`}
+          >
             Danh sách từ
           </button>
+
           <button
             onClick={() => {
               if (confirm("Xoá tiến độ đã lưu của bài này?")) {
@@ -148,10 +182,10 @@ export default function StudySession({
             </p>
           ) : (
             <div key={deckKey}>
-              {mode === "flashcard" && <FlashcardMode cards={filtered} />}
-              {mode === "quiz"      && <QuizMode      cards={filtered} />}
+              {mode === "flashcard" && <FlashcardMode cards={filtered} autoPlay={autoPlay} />}
+              {mode === "quiz"      && <QuizMode      cards={filtered} autoPlay={autoPlay} />}
               {mode === "match"     && <MatchMode      cards={filtered} />}
-              {mode === "typing"    && <TypingMode     cards={filtered} />}
+              {mode === "typing"    && <TypingMode     cards={filtered} autoPlay={autoPlay} />}
             </div>
           )}
         </div>

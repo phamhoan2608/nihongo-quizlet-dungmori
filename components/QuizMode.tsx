@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Card } from "@/lib/types";
 import { shuffle, sample } from "@/lib/shuffle";
 import { grade, prioritizeCards } from "@/lib/storage";
+import { speak } from "@/lib/tts";
 import Seal from "./Seal";
 import Speaker from "./Speaker";
 
@@ -23,7 +24,7 @@ function buildQuestions(cards: Card[]): Q[] {
   });
 }
 
-export default function QuizMode({ cards }: { cards: Card[] }) {
+export default function QuizMode({ cards, autoPlay }: { cards: Card[]; autoPlay?: boolean }) {
   const [qs, setQs] = useState<Q[]>([]);
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
@@ -38,6 +39,12 @@ export default function QuizMode({ cards }: { cards: Card[] }) {
 
   const q = qs[i];
   const finished = qs.length > 0 && i >= qs.length;
+
+  useEffect(() => {
+    if (!autoPlay || !q || finished) return;
+    const t = setTimeout(() => speak(q.card.reading || q.card.word), 300);
+    return () => clearTimeout(t);
+  }, [i, autoPlay, qs.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const choose = (opt: string) => {
     if (picked) return;

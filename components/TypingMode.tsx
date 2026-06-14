@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "@/lib/types";
 import { grade, prioritizeCards } from "@/lib/storage";
 import { cleanReading } from "@/lib/romaji";
+import { speak } from "@/lib/tts";
 import Speaker from "./Speaker";
 import Seal from "./Seal";
 
@@ -35,7 +36,7 @@ function isKanaMatch(input: string, reading: string): boolean {
   return got === want;
 }
 
-export default function TypingMode({ cards }: { cards: Card[] }) {
+export default function TypingMode({ cards, autoPlay }: { cards: Card[]; autoPlay?: boolean }) {
   const [answerMode, setAnswerMode] = useState<AnswerMode>("meaning");
   const [deck, setDeck] = useState<Card[]>([]);
   const [i, setI] = useState(0);
@@ -58,6 +59,12 @@ export default function TypingMode({ cards }: { cards: Card[] }) {
   useEffect(() => {
     if (!finished) inputRef.current?.focus();
   }, [i, finished]);
+
+  useEffect(() => {
+    if (!autoPlay || !card || finished) return;
+    const t = setTimeout(() => speak(card.reading || card.word), 300);
+    return () => clearTimeout(t);
+  }, [i, autoPlay, deck.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const check = () => {
     if (state !== "idle" || !value.trim()) return;

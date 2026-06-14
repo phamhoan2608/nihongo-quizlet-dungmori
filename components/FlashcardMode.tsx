@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Card, Grade } from "@/lib/types";
 import { shuffle } from "@/lib/shuffle";
 import { grade, markMastered, getProgress, getMemoryLevel, prioritizeCards } from "@/lib/storage";
+import { speak } from "@/lib/tts";
 import Flashcard from "./Flashcard";
 
 const GRADES: { g: Grade; label: string; hint: string; cls: string }[] = [
@@ -13,7 +14,7 @@ const GRADES: { g: Grade; label: string; hint: string; cls: string }[] = [
   { g: "easy",  label: "Dễ",         hint: "4", cls: "border-moss text-moss hover:bg-moss/10"},
 ];
 
-export default function FlashcardMode({ cards }: { cards: Card[] }) {
+export default function FlashcardMode({ cards, autoPlay }: { cards: Card[]; autoPlay?: boolean }) {
   // ── State ─────────────────────────────────────────────────────────────────
   const [deck, setDeck] = useState<Card[]>([]);
   const [i, setI] = useState(0);
@@ -79,6 +80,12 @@ export default function FlashcardMode({ cards }: { cards: Card[] }) {
     setAgainCards([]);
     setRound(1);
   }, [cards]);
+
+  useEffect(() => {
+    if (!autoPlay || !card || deck.length === 0 || finished) return;
+    const t = setTimeout(() => speak(card.reading || card.word), 300);
+    return () => clearTimeout(t);
+  }, [i, autoPlay, deck.length]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (finished || deck.length === 0) return;

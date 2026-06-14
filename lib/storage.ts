@@ -166,6 +166,21 @@ export function lessonStats(ids: number[]): LessonStats {
   return { seen, mastered };
 }
 
+// ── Auto-play setting ─────────────────────────────────────────────────────
+
+const AUTOPLAY_KEY = "minna-autoplay-v1";
+
+export function getAutoPlay(): boolean {
+  if (typeof window === "undefined") return true;
+  const v = localStorage.getItem(AUTOPLAY_KEY);
+  return v === null ? true : v === "true"; // default: on
+}
+
+export function setAutoPlay(v: boolean): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(AUTOPLAY_KEY, String(v));
+}
+
 // ── Important words ────────────────────────────────────────────────────────
 
 function readImportant(): Set<number> {
