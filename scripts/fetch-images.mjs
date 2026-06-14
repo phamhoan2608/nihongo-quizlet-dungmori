@@ -61,7 +61,17 @@ function cleanWord(w) {
     .replace(/[（(][^）)]*[）)]/g, "")
     .replace(/[、。]/g, " ")
     .trim()
-    .split(/\s+/)[0]; // take first word if multiple
+    .split(/\s+/)[0];
+}
+
+/** Extract the first clean term from a Vietnamese meaning string. */
+function cleanMeaning(meaning) {
+  return meaning
+    .split(/[,，;；/]/)[0]
+    .replace(/[①②③④⑤]/g, "")
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .replace(/[~～]/g, "")
+    .trim();
 }
 
 /**
@@ -75,6 +85,21 @@ function getEnglishFromJisho(word) {
   const data = curlGet(url);
   const defs = data?.data?.[0]?.senses?.[0]?.english_definitions;
   return defs?.[0] ?? null;
+}
+
+/**
+ * Translate Vietnamese meaning → English using MyMemory free API.
+ * Returns null on failure.
+ */
+function translateViToEn(meaning) {
+  const text = cleanMeaning(meaning);
+  if (!text) return null;
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=vi|en`;
+  const data = curlGet(url);
+  const result = data?.responseData?.translatedText;
+  // MyMemory returns the input unchanged if it can't translate
+  if (!result || result.toLowerCase() === text.toLowerCase()) return null;
+  return result;
 }
 
 /**
@@ -108,9 +133,16 @@ for (const card of todo) {
   const jp = cleanWord(card.reading || card.word);
   process.stdout.write(`[${card.id}] ${jp} … `);
 
-  // Step 1: Japanese → English via Jisho
-  const english = getEnglishFromJisho(jp);
-  sleep(400); // be polite to Jisho
+  // Step 1a: Japanese → English via Jisho
+  let english = getEnglishFromJisho(jp);
+  sleep(300);
+
+  // Step 1b: fallback — translate Vietnamese meaning via MyMemory
+  if (!english) {
+    english = translateViToEn(card.meaning);
+    sleep(300);
+    if (english) process.stdout.write(`[vi→en] `);
+  }
 
   if (!english) {
     noEn++;
