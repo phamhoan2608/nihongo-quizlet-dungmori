@@ -54,3 +54,7 @@ export function getCards(course: string, lesson: number): Card[] {
 export function countCards(course: string): number {
   return (RAW[course] ?? []).length;
 }
+
+export function getAllCards(): Card[] {
+  return Object.keys(RAW).flatMap((course) => courseCards(course));
+}

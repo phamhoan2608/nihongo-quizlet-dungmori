@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { COURSES } from "@/lib/courses";
-import { getLessons, countCards } from "@/lib/vocab";
+import { getLessons, countCards, getAllCards } from "@/lib/vocab";
+import SearchBox from "@/components/SearchBox";
 
 export default function Home() {
+  const allCards = getAllCards();
+
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:py-16">
-      <header className="mb-10 sm:mb-14">
+      <header className="mb-8 sm:mb-12">
         <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-shu">
           みんなの日本語 · Flashcards
         </p>
@@ -17,6 +20,11 @@ export default function Home() {
           Tiến độ được lưu ngay trên máy.
         </p>
       </header>
+
+      {/* Search */}
+      <div className="mb-10">
+        <SearchBox cards={allCards} />
+      </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {COURSES.map((course) => {
