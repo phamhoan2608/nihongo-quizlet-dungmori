@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Card, Grade } from "@/lib/types";
+import type { Card, Grade, Mode } from "@/lib/types";
 import { shuffle } from "@/lib/shuffle";
 import { grade, markMastered, getProgress, getMemoryLevel, prioritizeCards } from "@/lib/storage";
 import { speak } from "@/lib/tts";
@@ -14,7 +14,17 @@ const GRADES: { g: Grade; label: string; hint: string; cls: string }[] = [
   { g: "easy",  label: "Dễ",         hint: "4", cls: "border-moss text-moss hover:bg-moss/10"},
 ];
 
-export default function FlashcardMode({ cards, autoPlay }: { cards: Card[]; autoPlay?: boolean }) {
+const NEW_WORD_THRESHOLD = 20;
+
+export default function FlashcardMode({
+  cards,
+  autoPlay,
+  onSwitchMode,
+}: {
+  cards: Card[];
+  autoPlay?: boolean;
+  onSwitchMode?: (mode: Mode) => void;
+}) {
   // ── State ─────────────────────────────────────────────────────────────────
   const [deck, setDeck] = useState<Card[]>([]);
   const [i, setI] = useState(0);
@@ -22,6 +32,9 @@ export default function FlashcardMode({ cards, autoPlay }: { cards: Card[]; auto
   const [done, setDone] = useState(0);
   const [againCards, setAgainCards] = useState<Card[]>([]);
   const [round, setRound] = useState(1);
+  const [newWordsCount, setNewWordsCount] = useState(0);
+  const [showSuggestion, setShowSuggestion] = useState(false);
+  const [suggestionDone, setSuggestionDone] = useState(false);
 
   // ── Derived (no hooks) ────────────────────────────────────────────────────
   const card = deck[i];
@@ -30,7 +43,9 @@ export default function FlashcardMode({ cards, autoPlay }: { cards: Card[]; auto
   // ── Callbacks (all hooks before any early return) ─────────────────────────
   const handleGrade = useCallback((g: Grade) => {
     if (!card) return;
+    const isNew = getProgress(card.id).reps === 0;
     grade(card.id, g, "flashcard");
+    if (isNew) setNewWordsCount((c) => c + 1);
     setDone((d) => d + 1);
     setFlipped(false);
     if (g === "again") setAgainCards((prev) => [...prev, card]);
@@ -79,7 +94,16 @@ export default function FlashcardMode({ cards, autoPlay }: { cards: Card[]; auto
     setDone(0);
     setAgainCards([]);
     setRound(1);
+    setNewWordsCount(0);
+    setShowSuggestion(false);
+    setSuggestionDone(false);
   }, [cards]);
+
+  useEffect(() => {
+    if (newWordsCount >= NEW_WORD_THRESHOLD && !suggestionDone) {
+      setShowSuggestion(true);
+    }
+  }, [newWordsCount, suggestionDone]);
 
   useEffect(() => {
     if (!autoPlay || !card || deck.length === 0 || finished) return;
@@ -248,6 +272,51 @@ export default function FlashcardMode({ cards, autoPlay }: { cards: Card[]; auto
       <p className="mt-2 text-center text-xs text-sub/50">
         ← → điều hướng · Space lật · Enter tiếp · 1–4 đánh giá · 5 đã thuộc
       </p>
+
+      {/* Mode suggestion banner */}
+      {showSuggestion && (
+        <div className="mt-4 rounded-2xl border border-indigo/30 bg-indigo-soft px-4 py-3">
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-indigo">
+                Bạn đã làm quen {newWordsCount} từ mới!
+              </p>
+              <p className="mt-0.5 text-xs text-sub">
+                Hãy thử chuyển sang chế độ khác để ghi nhớ sâu hơn.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => { onSwitchMode?.("quiz"); setShowSuggestion(false); }}
+                  className="rounded-lg bg-indigo px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-deep"
+                >
+                  Trắc nghiệm
+                </button>
+                <button
+                  onClick={() => { onSwitchMode?.("typing"); setShowSuggestion(false); }}
+                  className="rounded-lg bg-indigo px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-deep"
+                >
+                  Gõ đáp án
+                </button>
+                <button
+                  onClick={() => { onSwitchMode?.("listen"); setShowSuggestion(false); }}
+                  className="rounded-lg bg-indigo px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-deep"
+                >
+                  Nghe
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => { setShowSuggestion(false); setSuggestionDone(true); }}
+              aria-label="Đóng"
+              className="mt-0.5 text-sub hover:text-ink"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,7 +6,6 @@ import { shuffle, sample } from "@/lib/shuffle";
 import { grade, prioritizeCards } from "@/lib/storage";
 import { speak } from "@/lib/tts";
 import Seal from "./Seal";
-import Speaker from "./Speaker";
 
 interface Q {
   card: Card;
@@ -24,7 +23,7 @@ function buildQuestions(cards: Card[]): Q[] {
   });
 }
 
-export default function QuizMode({ cards, autoPlay }: { cards: Card[]; autoPlay?: boolean }) {
+export default function ListenMode({ cards }: { cards: Card[] }) {
   const [qs, setQs] = useState<Q[]>([]);
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
@@ -40,11 +39,12 @@ export default function QuizMode({ cards, autoPlay }: { cards: Card[]; autoPlay?
   const q = qs[i];
   const finished = qs.length > 0 && i >= qs.length;
 
+  // Auto-play on each new question
   useEffect(() => {
-    if (!autoPlay || !q || finished) return;
-    const t = setTimeout(() => speak(q.card.reading || q.card.word), 300);
+    if (!q || finished || qs.length === 0) return;
+    const t = setTimeout(() => speak(q.card.reading || q.card.word), 400);
     return () => clearTimeout(t);
-  }, [i, autoPlay, qs.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [i, qs.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const choose = useCallback((opt: string) => {
     if (picked || !q) return;
@@ -66,6 +66,7 @@ export default function QuizMode({ cards, autoPlay }: { cards: Card[]; autoPlay?
     setScore(0);
   };
 
+  // Keyboard shortcuts
   useEffect(() => {
     if (finished || !q) return;
     const onKey = (e: KeyboardEvent) => {
@@ -74,6 +75,7 @@ export default function QuizMode({ cards, autoPlay }: { cards: Card[]; autoPlay?
       if (!picked) {
         const idx = ["1", "2", "3", "4"].indexOf(e.key);
         if (idx !== -1 && q.options[idx]) { e.preventDefault(); choose(q.options[idx]); }
+        if (e.key === " " || e.key === "r") { e.preventDefault(); speak(q.card.reading || q.card.word); }
       } else {
         if (e.key === "Enter") { e.preventDefault(); next(); }
       }
@@ -93,12 +95,9 @@ export default function QuizMode({ cards, autoPlay }: { cards: Card[]; autoPlay?
     const pct = Math.round((score / qs.length) * 100);
     return (
       <div className="flex flex-col items-center rounded-3xl border border-line bg-card p-10 text-center shadow-card">
-        <p className="text-sm font-semibold uppercase tracking-widest text-sub">
-          Kết quả
-        </p>
+        <p className="text-sm font-semibold uppercase tracking-widest text-sub">Kết quả</p>
         <p className="mt-2 font-jp text-5xl font-bold text-indigo">
-          {score}
-          <span className="text-2xl text-sub">/{qs.length}</span>
+          {score}<span className="text-2xl text-sub">/{qs.length}</span>
         </p>
         <p className="mt-2 text-sub">Đúng {pct}%</p>
         <button
@@ -114,25 +113,42 @@ export default function QuizMode({ cards, autoPlay }: { cards: Card[]; autoPlay?
   return (
     <div>
       <div className="mb-3 flex items-center justify-between text-sm text-sub">
-        <span>
-          Câu {i + 1} / {qs.length}
-        </span>
+        <span>Câu {i + 1} / {qs.length}</span>
         <span>Đúng {score}</span>
       </div>
       <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-line">
         <div className="h-full bg-indigo transition-all" style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="relative mb-4 flex flex-col items-center rounded-3xl border border-line bg-card px-6 py-6 shadow-card">
-        <Speaker text={q.card.reading || q.card.word} className="absolute right-4 top-4" />
-        <p className="font-jp text-5xl font-bold text-ink">{q.card.reading || q.card.word}</p>
-        {q.card.reading !== q.card.word && (
-          <p className="mt-2 font-jp text-base text-sub/60">{q.card.word}</p>
-        )}
+      {/* Audio card */}
+      <div className="relative mb-4 flex flex-col items-center gap-3 rounded-3xl border border-line bg-card px-6 py-8 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-widest text-sub">
+          Nghe và chọn nghĩa đúng
+        </p>
+        <button
+          onClick={() => speak(q.card.reading || q.card.word)}
+          aria-label="Phát âm"
+          className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo text-white shadow-lift transition hover:bg-indigo-deep active:scale-95"
+        >
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+          </svg>
+        </button>
+
+        {/* Reveal word after answering */}
         {picked && (
-          <span className="absolute -right-2 -top-2">
-            {picked === q.card.meaning ? <Seal /> : null}
-          </span>
+          <p className="font-jp text-3xl font-bold text-ink">
+            {q.card.reading || q.card.word}
+            {q.card.reading !== q.card.word && (
+              <span className="ml-2 text-base text-sub/60">{q.card.word}</span>
+            )}
+          </p>
+        )}
+
+        {picked === q.card.meaning && (
+          <span className="absolute -right-2 -top-2"><Seal /></span>
         )}
       </div>
 
@@ -169,6 +185,10 @@ export default function QuizMode({ cards, autoPlay }: { cards: Card[]; autoPlay?
           <span className="ml-1.5 text-xs opacity-50">[Enter]</span>
         </button>
       )}
+
+      <p className="mt-2 text-center text-xs text-sub/50">
+        Space/R phát lại · 1–4 chọn đáp án · Enter tiếp theo
+      </p>
     </div>
   );
 }

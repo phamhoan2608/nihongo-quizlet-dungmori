@@ -8,6 +8,7 @@ import FlashcardMode from "./FlashcardMode";
 import QuizMode from "./QuizMode";
 import MatchMode from "./MatchMode";
 import TypingMode from "./TypingMode";
+import ListenMode from "./ListenMode";
 import WordList from "./WordList";
 
 const MODES: { id: Mode; label: string }[] = [
@@ -15,6 +16,7 @@ const MODES: { id: Mode; label: string }[] = [
   { id: "quiz",      label: "Trắc nghiệm" },
   { id: "match",     label: "Nối cặp" },
   { id: "typing",    label: "Gõ đáp án" },
+  { id: "listen",    label: "Nghe" },
 ];
 
 export default function StudySession({
@@ -182,10 +184,11 @@ export default function StudySession({
             </p>
           ) : (
             <div key={deckKey}>
-              {mode === "flashcard" && <FlashcardMode cards={filtered} autoPlay={autoPlay} />}
+              {mode === "flashcard" && <FlashcardMode cards={filtered} autoPlay={autoPlay} onSwitchMode={setMode} />}
               {mode === "quiz"      && <QuizMode      cards={filtered} autoPlay={autoPlay} />}
               {mode === "match"     && <MatchMode      cards={filtered} />}
               {mode === "typing"    && <TypingMode     cards={filtered} autoPlay={autoPlay} />}
+              {mode === "listen"    && <ListenMode     cards={filtered} />}
             </div>
           )}
         </div>
