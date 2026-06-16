@@ -1,8 +1,26 @@
-// Primary: Google Translate TTS — natural Japanese voice, no API key needed.
-// Fallback: Web Speech API (browser built-in) if Google TTS is blocked.
+// TTS chain:
+//   1. VOICEVOX via /api/tts proxy — natural pitch accent, best quality
+//   2. Google Translate TTS         — decent fallback, no key needed
+//   3. Web Speech API               — browser built-in, last resort
+
+const VOICEVOX_TIMEOUT_MS = 5000;
 
 let jpVoice: SpeechSynthesisVoice | null = null;
 let currentAudio: HTMLAudioElement | null = null;
+let currentGen = 0;
+
+function stopAll(): number {
+  currentGen++;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.src = "";
+    currentAudio = null;
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+  return currentGen;
+}
 
 function pickVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
@@ -37,27 +55,43 @@ function speakWebSpeech(text: string): void {
   window.speechSynthesis.speak(u);
 }
 
-export function speak(text: string): void {
+function speakGoogleTTS(text: string, gen: number): void {
+  if (gen !== currentGen) return;
+  const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&tl=ja&client=gtx&q=${encodeURIComponent(text)}`;
+  const audio = new Audio(url);
+  currentAudio = audio;
+  audio.play().catch(() => speakWebSpeech(text));
+}
+
+// Calls our Next.js proxy (/api/tts) which forwards to VOICEVOX community API server-side,
+// avoiding CORS issues in the browser.
+function tryVoicevox(text: string, gen: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}`);
+
+    const fail = () => { audio.src = ""; resolve(false); };
+    const tid = setTimeout(fail, VOICEVOX_TIMEOUT_MS);
+
+    audio.oncanplaythrough = () => {
+      clearTimeout(tid);
+      if (gen !== currentGen) { audio.src = ""; resolve(true); return; }
+      currentAudio = audio;
+      audio.play().then(() => resolve(true)).catch(fail);
+    };
+
+    audio.onerror = () => { clearTimeout(tid); resolve(false); };
+  });
+}
+
+export async function speak(text: string): Promise<void> {
   if (typeof window === "undefined") return;
   const clean = cleanText(text);
   if (!clean) return;
 
-  // Stop any currently playing audio
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.src = "";
-    currentAudio = null;
-  }
-  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  const gen = stopAll();
 
-  // Google Translate TTS — significantly better quality than Web Speech API
-  const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(clean)}`;
-  const audio = new Audio(url);
-  currentAudio = audio;
-  audio.play().catch(() => {
-    // Google TTS blocked or unavailable — fall back to browser voice
-    speakWebSpeech(clean);
-  });
+  const ok = await tryVoicevox(clean, gen);
+  if (!ok) speakGoogleTTS(clean, gen);
 }
 
 export function ttsSupported(): boolean {
