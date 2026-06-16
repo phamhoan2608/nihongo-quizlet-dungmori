@@ -50,8 +50,8 @@ if (reset) console.log("--reset: clearing existing images.\n");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
+function sleep(seconds) {
+  execSync(`sleep ${seconds}`);
 }
 
 /** Strip Japanese prefix/suffix markers before looking up. */
@@ -118,7 +118,7 @@ function fetchPixabayImage(keyword) {
   const data = curlGet(`https://pixabay.com/api/?${params}`);
   if (!data) return null;
   const hit = data.hits?.find((h) => h.imageWidth >= h.imageHeight) ?? data.hits?.[0];
-  return hit?.webformatURL ?? null;
+  return hit?.previewURL ?? null;
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -135,12 +135,12 @@ for (const card of todo) {
 
   // Step 1a: Japanese → English via Jisho
   let english = getEnglishFromJisho(jp);
-  sleep(300);
+  sleep(0.5);
 
   // Step 1b: fallback — translate Vietnamese meaning via MyMemory
   if (!english) {
     english = translateViToEn(card.meaning);
-    sleep(300);
+    sleep(0.4);
     if (english) process.stdout.write(`[vi→en] `);
   }
 
@@ -154,7 +154,7 @@ for (const card of todo) {
 
   // Step 2: English → image via Pixabay
   const imageUrl = fetchPixabayImage(english);
-  sleep(650); // Pixabay free: 100 req/min
+  sleep(0.7); // Pixabay free: 100 req/min
 
   if (imageUrl) {
     result[String(card.id)] = imageUrl;
