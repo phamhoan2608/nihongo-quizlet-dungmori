@@ -14,7 +14,7 @@ const GRADES: { g: Grade; label: string; hint: string; cls: string }[] = [
   { g: "easy",  label: "Dễ",         hint: "4", cls: "border-moss text-moss hover:bg-moss/10"},
 ];
 
-const NEW_WORD_THRESHOLD = 20;
+const NEW_WORD_THRESHOLD = 10;
 
 export default function FlashcardMode({
   cards,
