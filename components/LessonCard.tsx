@@ -31,9 +31,16 @@ export default function LessonCard({ info }: { info: LessonInfo }) {
             {info.lesson}
           </p>
         </div>
-        <span className="rounded-full bg-indigo-soft px-2.5 py-1 text-xs font-semibold text-indigo">
-          {info.total} thẻ
-        </span>
+        <div className="flex flex-col items-end gap-1.5">
+          <span className="rounded-full bg-indigo-soft px-2.5 py-1 text-xs font-semibold text-indigo">
+            {info.total} thẻ
+          </span>
+          {seen === 0 && (
+            <span className="rounded-full bg-shu px-2.5 py-1 text-xs font-semibold text-white">
+              New
+            </span>
+          )}
+        </div>
       </div>
 
       <p className="mt-4 text-sm text-sub">

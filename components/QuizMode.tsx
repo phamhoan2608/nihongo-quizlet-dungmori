@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Card } from "@/lib/types";
 import { shuffle, sample } from "@/lib/shuffle";
-import { grade, prioritizeCards } from "@/lib/storage";
+import { grade, prioritizeCards, saveSessionCardId, loadSessionCardId } from "@/lib/storage";
 import { speak } from "@/lib/tts";
 import Seal from "./Seal";
 import Speaker from "./Speaker";
@@ -24,18 +24,25 @@ function buildQuestions(cards: Card[]): Q[] {
   });
 }
 
-export default function QuizMode({ cards, autoPlay }: { cards: Card[]; autoPlay?: boolean }) {
+export default function QuizMode({ cards, autoPlay, sessionKey }: { cards: Card[]; autoPlay?: boolean; sessionKey?: string }) {
   const [qs, setQs] = useState<Q[]>([]);
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [score, setScore] = useState(0);
 
   useEffect(() => {
-    setQs(buildQuestions(cards));
-    setI(0);
+    const newQs = buildQuestions(cards);
+    const savedId = sessionKey ? loadSessionCardId(sessionKey, "quiz") : null;
+    const initialI = savedId != null ? Math.max(0, newQs.findIndex((q) => q.card.id === savedId)) : 0;
+    setQs(newQs);
+    setI(initialI);
     setPicked(null);
     setScore(0);
-  }, [cards]);
+  }, [cards]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (sessionKey && qs[i]) saveSessionCardId(sessionKey, "quiz", qs[i].card.id);
+  }, [i, sessionKey, qs]);
 
   const q = qs[i];
   const finished = qs.length > 0 && i >= qs.length;

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "fetch-images": "node scripts/fetch-images.mjs",
+    "fetch-images:reset": "node scripts/fetch-images.mjs --reset"
   },
   "dependencies": {
     "next": "^14.2.5",

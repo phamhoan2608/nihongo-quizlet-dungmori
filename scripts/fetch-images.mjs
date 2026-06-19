@@ -30,11 +30,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
 // ── Args ─────────────────────────────────────────────────────────────────────
-const apiKey = process.argv.find((a) => a.startsWith("--key="))?.slice(6);
+// Key priority: --key=... arg > PIXABAY_API_KEY in .env.local
+function loadEnvKey() {
+  const envPath = path.join(ROOT, ".env.local");
+  if (!fs.existsSync(envPath)) return undefined;
+  const line = fs.readFileSync(envPath, "utf-8")
+    .split("\n")
+    .find((l) => l.startsWith("PIXABAY_API_KEY="));
+  return line?.split("=")[1]?.trim();
+}
+
+const apiKey = process.argv.find((a) => a.startsWith("--key="))?.slice(6) ?? loadEnvKey();
 const reset  = process.argv.includes("--reset");
 
 if (!apiKey) {
-  console.error("Usage: node scripts/fetch-images.mjs --key=YOUR_PIXABAY_KEY [--reset]");
+  console.error("Usage: node scripts/fetch-images.mjs [--key=YOUR_PIXABAY_KEY] [--reset]");
+  console.error("       (or set PIXABAY_API_KEY in .env.local)");
   process.exit(1);
 }
 

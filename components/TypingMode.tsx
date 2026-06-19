@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "@/lib/types";
-import { grade, prioritizeCards } from "@/lib/storage";
+import { grade, prioritizeCards, saveSessionCardId, loadSessionCardId } from "@/lib/storage";
 import { cleanReading } from "@/lib/romaji";
 import { speak } from "@/lib/tts";
 import Speaker from "./Speaker";
@@ -36,7 +36,7 @@ function isKanaMatch(input: string, reading: string): boolean {
   return got === want;
 }
 
-export default function TypingMode({ cards, autoPlay }: { cards: Card[]; autoPlay?: boolean }) {
+export default function TypingMode({ cards, autoPlay, sessionKey }: { cards: Card[]; autoPlay?: boolean; sessionKey?: string }) {
   const [answerMode, setAnswerMode] = useState<AnswerMode>("meaning");
   const [deck, setDeck] = useState<Card[]>([]);
   const [i, setI] = useState(0);
@@ -46,12 +46,19 @@ export default function TypingMode({ cards, autoPlay }: { cards: Card[]; autoPla
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setDeck(prioritizeCards(cards));
-    setI(0);
+    const newDeck = prioritizeCards(cards);
+    const savedId = sessionKey ? loadSessionCardId(sessionKey, "typing") : null;
+    const initialI = savedId != null ? Math.max(0, newDeck.findIndex((c) => c.id === savedId)) : 0;
+    setDeck(newDeck);
+    setI(initialI);
     setValue("");
     setState("idle");
     setScore(0);
-  }, [cards, answerMode]);
+  }, [cards, answerMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (sessionKey && deck[i]) saveSessionCardId(sessionKey, "typing", deck[i].id);
+  }, [i, sessionKey, deck]);
 
   const card = deck[i];
   const finished = deck.length > 0 && i >= deck.length;

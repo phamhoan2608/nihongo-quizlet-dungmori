@@ -166,6 +166,39 @@ export function lessonStats(ids: number[]): LessonStats {
   return { seen, mastered };
 }
 
+// ── Session position (restore card on reload) ─────────────────────────────
+
+const SP = "minna-session";
+
+export function saveSessionMode(key: string, mode: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(`${SP}:${key}:mode`, mode);
+}
+
+export function loadSessionMode(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(`${SP}:${key}:mode`);
+}
+
+export function saveSessionCardId(key: string, mode: string, cardId: number): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(`${SP}:${key}:${mode}:pos`, String(cardId));
+}
+
+export function loadSessionCardId(key: string, mode: string): number | null {
+  if (typeof window === "undefined") return null;
+  const v = localStorage.getItem(`${SP}:${key}:${mode}:pos`);
+  return v !== null ? Number(v) : null;
+}
+
+export function clearSessionPos(key: string): void {
+  if (typeof window === "undefined") return;
+  const prefix = `${SP}:${key}:`;
+  for (const k of Object.keys(localStorage)) {
+    if (k.startsWith(prefix)) localStorage.removeItem(k);
+  }
+}
+
 // ── Auto-play setting ─────────────────────────────────────────────────────
 
 const AUTOPLAY_KEY = "minna-autoplay-v1";
