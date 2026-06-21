@@ -126,6 +126,14 @@ npm run build
 - Dùng Google TTS với params giống website (`client=gtx&prev=input`) để ra giọng neural
 - Fallback: Web Speech API (`speechSynthesis`)
 
+## Quy tắc cập nhật design doc
+
+Sau mỗi khi thêm tính năng mới, thay đổi UX, hoặc sửa bug quan trọng → **tự động cập nhật `docs/DESIGN.md`** mà không cần user nhắc:
+- Thêm tính năng → thêm mục mô tả vào section phù hợp
+- Sửa bug → thêm vào bảng "Bugs đã sửa"
+- Xóa tính năng → xóa mục cũ
+- Luôn cập nhật dòng "Cập nhật lần cuối"
+
 ## Quy tắc quan trọng
 
 - **Không dùng proxy cho ảnh** — dùng thẳng `cdn.pixabay.com` previewURL (public CDN)

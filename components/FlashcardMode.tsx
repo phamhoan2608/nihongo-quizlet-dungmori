@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Card } from "@/lib/types";
-import { getProgress, getMemoryLevel, prioritizeCards, saveSessionCardId, loadSessionCardId } from "@/lib/storage";
+import { getProgress, getMemoryLevel, prioritizeCards, saveSessionCardId, loadSessionCardId, saveSessionDeck, loadSessionDeck } from "@/lib/storage";
 import { speak } from "@/lib/tts";
 import Flashcard from "./Flashcard";
 
@@ -31,14 +31,29 @@ export default function FlashcardMode({
     setI((x) => x + 1);
   }, []);
 
+  const buildDeck = useCallback((fresh?: boolean): Card[] => {
+    if (!fresh && sessionKey) {
+      const savedIds = loadSessionDeck(sessionKey, "flashcard");
+      if (savedIds) {
+        const map = new Map(cards.map((c) => [c.id, c]));
+        const restored = savedIds.map((id) => map.get(id)).filter(Boolean) as Card[];
+        if (restored.length > 0) return restored;
+      }
+    }
+    const d = prioritizeCards(cards);
+    if (sessionKey) saveSessionDeck(sessionKey, "flashcard", d.map((c) => c.id));
+    return d;
+  }, [cards, sessionKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const restart = useCallback(() => {
-    setDeck(prioritizeCards(cards));
+    const d = buildDeck(true);
+    setDeck(d);
     setI(0);
     setFlipped(false);
-  }, [cards]);
+  }, [buildDeck]);
 
   useEffect(() => {
-    const newDeck = prioritizeCards(cards);
+    const newDeck = buildDeck();
     const savedId = sessionKey ? loadSessionCardId(sessionKey, "flashcard") : null;
     const initialI = savedId != null ? Math.max(0, newDeck.findIndex((c) => c.id === savedId)) : 0;
     setDeck(newDeck);

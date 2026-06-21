@@ -191,6 +191,29 @@ export function loadSessionCardId(key: string, mode: string): number | null {
   return v !== null ? Number(v) : null;
 }
 
+export function saveSessionDeck(key: string, mode: string, ids: number[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(`${SP}:${key}:${mode}:deck`, JSON.stringify(ids));
+}
+
+export function loadSessionDeck(key: string, mode: string): number[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = localStorage.getItem(`${SP}:${key}:${mode}:deck`);
+    return v ? (JSON.parse(v) as number[]) : null;
+  } catch { return null; }
+}
+
+export function saveSessionSection(key: string, section: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(`${SP}:${key}:section`, section);
+}
+
+export function loadSessionSection(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(`${SP}:${key}:section`);
+}
+
 export function clearSessionPos(key: string): void {
   if (typeof window === "undefined") return;
   const prefix = `${SP}:${key}:`;

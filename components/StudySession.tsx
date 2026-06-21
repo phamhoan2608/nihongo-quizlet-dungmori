@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Card, Mode } from "@/lib/types";
-import { resetLesson, getAutoPlay, setAutoPlay, saveSessionMode, loadSessionMode, clearSessionPos, lessonStats } from "@/lib/storage";
+import { resetLesson, getAutoPlay, setAutoPlay, saveSessionMode, loadSessionMode, saveSessionSection, loadSessionSection, clearSessionPos, lessonStats } from "@/lib/storage";
 import FlashcardMode from "./FlashcardMode";
 import QuizMode from "./QuizMode";
 import MatchMode from "./MatchMode";
@@ -38,6 +38,8 @@ export default function StudySession({
     setAutoPlayState(getAutoPlay());
     const savedMode = loadSessionMode(sessionKey) as Mode | null;
     if (savedMode && MODES.some((m) => m.id === savedMode)) setMode(savedMode);
+    const savedSection = loadSessionSection(sessionKey);
+    if (savedSection) setSection(savedSection);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const switchMode = (m: Mode) => {
@@ -56,14 +58,21 @@ export default function StudySession({
     [cards]
   );
 
-  const sectionInfos = useMemo(() =>
-    sections.map((s) => {
-      const sc = cards.filter((c) => c.section === s);
-      const stats = lessonStats(sc.map((c) => c.id));
-      return { id: s, total: sc.length, seen: stats.seen, mastered: stats.mastered };
-    }),
+  const sectionTotals = useMemo(() =>
+    sections.map((s) => ({ id: s, total: cards.filter((c) => c.section === s).length })),
     [sections, cards]
   );
+
+  const [sectionStats, setSectionStats] = useState<Record<string, { seen: number; mastered: number }>>({});
+
+  useEffect(() => {
+    const stats: Record<string, { seen: number; mastered: number }> = {};
+    sections.forEach((s) => {
+      const ids = cards.filter((c) => c.section === s).map((c) => c.id);
+      stats[s] = lessonStats(ids);
+    });
+    setSectionStats(stats);
+  }, [sections, cards]);
 
   const filtered = useMemo(() => {
     if (!section) return [];
@@ -89,20 +98,20 @@ export default function StudySession({
         <p className="mt-1 text-sm text-sub">Chọn phần để bắt đầu học</p>
 
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {sectionInfos.map((si) => {
-            const pct = si.total > 0 ? Math.round((si.seen / si.total) * 100) : 0;
+          {sectionTotals.map(({ id, total }) => {
+            const stats = sectionStats[id] ?? { seen: 0, mastered: 0 };
+            const pct = total > 0 ? Math.round((stats.seen / total) * 100) : 0;
             return (
               <button
-                key={si.id}
-                onClick={() => setSection(si.id)}
+                key={id}
+                onClick={() => { setSection(id); saveSessionSection(sessionKey, id); }}
                 className="group flex flex-col rounded-2xl border border-line bg-card p-6 text-left shadow-card transition hover:-translate-y-1 hover:border-indigo hover:shadow-lift"
               >
                 <p className="text-xs font-semibold uppercase tracking-widest text-sub">Phần</p>
-                <p className="font-jp text-5xl font-bold text-ink">{si.id}</p>
+                <p className="font-jp text-5xl font-bold text-ink">{id}</p>
 
-                <p className="mt-3 text-sm text-sub">{si.total} thẻ</p>
+                <p className="mt-3 text-sm text-sub">{total} thẻ</p>
 
-                {/* Progress bar */}
                 <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-line">
                   <div
                     className="h-full rounded-full bg-indigo transition-all"
@@ -110,9 +119,9 @@ export default function StudySession({
                   />
                 </div>
                 <p className="mt-1.5 text-xs text-sub">
-                  {si.seen}/{si.total} đã học
-                  {si.mastered > 0 && (
-                    <span className="ml-2 text-moss">· {si.mastered} thuộc</span>
+                  {stats.seen}/{total} đã học
+                  {stats.mastered > 0 && (
+                    <span className="ml-2 text-moss">· {stats.mastered} thuộc</span>
                   )}
                 </p>
 
@@ -135,7 +144,7 @@ export default function StudySession({
       <div className="flex flex-none items-center justify-between gap-2 pt-3 pb-2">
         <div className="flex min-w-0 items-baseline gap-2">
           <button
-            onClick={() => setSection(null)}
+            onClick={() => { setSection(null); saveSessionSection(sessionKey, ""); }}
             className="text-sm font-semibold text-indigo hover:underline"
           >
             ← Bài {lesson}
