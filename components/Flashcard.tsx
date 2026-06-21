@@ -28,7 +28,7 @@ export default function Flashcard({
         role="button"
         tabIndex={0}
         onClick={onFlip}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onFlip(); }}
+        onKeyDown={(e) => { if (e.key === "Enter") onFlip(); }}
         aria-label="Lật thẻ"
         className="block w-full cursor-pointer text-left outline-none"
       >
