@@ -2,14 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Light mode ──────────────────────────────────────────────────────────── */
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
+
+  /* Space-separated R G B (no rgb() wrapper) so Tailwind opacity modifiers work */
+  --c-paper:        244 244 251;   /* #F4F4FB — cool off-white */
+  --c-card:         255 255 255;   /* #FFFFFF */
+  --c-ink:          22  21  30;    /* #16151E */
+  --c-sub:          109 107 130;   /* #6D6B82 */
+  --c-line:         227 226 239;   /* #E3E2EF */
+  --c-indigo:       79  82  200;   /* #4F52C8 — bright modern indigo */
+  --c-indigo-soft:  237 238 255;   /* #EDEEFF */
+  --c-indigo-deep:  57  60  181;   /* #393CB5 */
+  --c-shu:          224 64  64;    /* #E04040 */
+  --c-shu-soft:     254 236 236;   /* #FEECEC */
+  --c-moss:         26  158 104;   /* #1A9E68 */
 }
 
+/* ── Dark / Night mode ───────────────────────────────────────────────────── */
+.dark {
+  color-scheme: dark;
+
+  --c-paper:        8   8   20;    /* #08081 4 — deep navy */
+  --c-card:         18  18  42;    /* #12122A */
+  --c-ink:          238 238 255;   /* #EEEEFF */
+  --c-sub:          172 168 208;   /* #ACA8D0 — much lighter: sub/60 now 5.2:1 */
+  --c-line:         54  52  100;   /* #363464 — visible borders */
+  --c-indigo:       140 148 252;   /* #8C94FC */
+  --c-indigo-soft:  36  36  110;   /* #24246E */
+  --c-indigo-deep:  182 188 255;   /* #B6BCFF */
+  --c-shu:          252 122 122;   /* #FC7A7A */
+  --c-shu-soft:     54  12  12;    /* #360C0C */
+  --c-moss:         58  218 156;   /* #3ADA9C */
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────── */
 html,
 body {
-  background: #f6f5f1;
-  color: #1b1a20;
+  background-color: rgb(var(--c-paper));
+  color: rgb(var(--c-ink));
 }
 
 body {
@@ -17,7 +49,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* 3D flip card */
+/* ── Shadows (dark mode override) ────────────────────────────────────────── */
+.dark .shadow-card {
+  box-shadow: 0 0 0 1px rgb(var(--c-line)), 0 8px 24px -8px rgba(0, 0, 0, .5);
+}
+.dark .shadow-lift {
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, .7), 0 0 0 1px rgb(var(--c-indigo) / .25);
+}
+
+/* ── Flashcard flip ──────────────────────────────────────────────────────── */
 .flip {
   perspective: 1600px;
 }
@@ -36,16 +76,24 @@ body {
   transform: rotateY(180deg);
 }
 
-/* hanko-style seal */
+/* Flashcard back in dark mode: deep indigo instead of bright indigo */
+.dark .flip-back {
+  background-color: rgb(36 36 110);
+  border-color: rgb(var(--c-indigo));
+}
+
+/* ── Hanko seal ──────────────────────────────────────────────────────────── */
 .seal {
   font-family: "Zen Maru Gothic", sans-serif;
 }
 
+/* ── Selection ───────────────────────────────────────────────────────────── */
 ::selection {
-  background: #2c3a8c;
+  background: rgb(var(--c-indigo));
   color: #fff;
 }
 
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .flip-inner,
   .flip-inner.is-flipped {

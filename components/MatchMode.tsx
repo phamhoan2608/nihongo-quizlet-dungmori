@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Card } from "@/lib/types";
 import { shuffle } from "@/lib/shuffle";
 import { speak } from "@/lib/tts";
@@ -32,7 +32,7 @@ export default function MatchMode({ cards }: { cards: Card[] }) {
   const [matched, setMatched] = useState<Set<number>>(new Set());
   const [wrongKeys, setWrongKeys] = useState<string[]>([]);
   const [moves, setMoves] = useState(0);
-  const [start] = useState(() => Date.now());
+  const startRef = useRef(Date.now());
   const [elapsed, setElapsed] = useState(0);
 
   const total = tiles.length / 2;
@@ -47,9 +47,9 @@ export default function MatchMode({ cards }: { cards: Card[] }) {
 
   useEffect(() => {
     if (allMatched) return;
-    const t = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 250);
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 250);
     return () => clearInterval(t);
-  }, [allMatched, start]);
+  }, [allMatched]);
 
   const onTile = (tile: Tile) => {
     if (matched.has(tile.cardId)) return;
@@ -76,6 +76,7 @@ export default function MatchMode({ cards }: { cards: Card[] }) {
   };
 
   const newRound = () => {
+    startRef.current = Date.now();
     setTiles(buildTiles(cards));
     setSel(null);
     setMatched(new Set());

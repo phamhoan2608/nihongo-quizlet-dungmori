@@ -7,7 +7,7 @@
 ## 1. Luồng học
 
 ```
-Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A/B/C) → Học
+Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A/B/C) → Chọn chế độ → Học
 ```
 
 ### 1.1 Trang chủ (`/`)
@@ -28,9 +28,15 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 - Mỗi card: tên phần, số thẻ, thanh tiến độ, "X/Y đã học · Z thuộc"
 - Bắt buộc chọn phần trước khi vào học (không có chế độ "học cả bài")
 
-### 1.4 Giao diện học
-- Header: nút quay lại chọn phần, tên phần, số thẻ, toggle Tự phát âm, checkbox Chỉ từ vựng, nút Đặt lại
-- Mode tabs: Lật thẻ / Trắc nghiệm / Nối cặp / Gõ đáp án / Nghe
+### 1.4 Màn hình chọn chế độ
+- Hiển thị sau khi chọn phần
+- Lưới 2–4 cột, mỗi ô: icon riêng + tên + mô tả ngắn
+- 7 chế độ: Lật thẻ / Trắc nghiệm / Nối cặp / Gõ đáp án / Nghe / Chính tả / Kiểm tra
+- Reload trang → khôi phục đúng phần + chế độ đang học (bỏ qua màn chọn)
+
+### 1.5 Giao diện học
+- Header: nút "← Phần X" (quay về chọn chế độ), số thẻ, toggle Tự phát âm, checkbox Chỉ từ vựng, nút Đặt lại
+- Mode tabs: icon + tên, cuộn ngang trên mobile, bấm để chuyển chế độ ngay
 - Nội dung học thay đổi theo mode
 
 ---
@@ -68,6 +74,22 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 - Phím tắt: 1–4 chọn, Enter sang câu tiếp
 - **Tính level**: đúng → +1, sai → -1
 
+### 2.6 Chính tả (Spell)
+- Phát âm từ tự động, gõ cách đọc kana
+- Hiển thị nghĩa tiếng Việt làm gợi ý
+- Ẩn chữ Nhật cho đến khi trả lời
+- Nút phát lại (R sau khi trả lời)
+- So sánh exact kana (hiragana/katakana)
+- **Tính level**: đúng → +1, sai → -1
+
+### 2.7 Kiểm tra (Test)
+- Xen kẽ 2 dạng câu hỏi:
+  - Trắc nghiệm (câu lẻ): thấy chữ Nhật → chọn nghĩa tiếng Việt
+  - Gõ kana (câu chẵn): thấy nghĩa tiếng Việt → gõ cách đọc kana
+- Phím tắt MC: 1–4 chọn, Enter tiếp theo
+- Kết quả cuối: điểm + danh sách từ sai để ôn lại
+- **Tính level**: đúng → +1, sai → -1
+
 ---
 
 ## 3. Hệ thống Level (SRS — Leitner Boxes)
@@ -82,7 +104,7 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 | 5 | Thành thạo | Chỉ qua `markMastered()` (hiện tạm ẩn) |
 
 - Flashcard **không** tính level
-- Exercise modes (Quiz, Typing, Listen, Match) tính level, tối đa box 4
+- Exercise modes (Quiz, Typing, Listen, Match, Spell, Test) tính level, tối đa box 4
 - Level hiển thị dưới dạng badge màu trên thẻ flashcard
 
 ---
@@ -148,6 +170,7 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 | TTS không chuẩn | `client=tw-ob` dùng engine cũ | Proxy server-side với params giống Google Translate website |
 | Session position sai khi reload | `prioritizeCards()` shuffle lại mỗi lần → deck order thay đổi | Lưu deck order vào localStorage, restore đúng thứ tự |
 | Ảnh bị 400 qua Next.js Image | URL chứa nested query params | Bỏ proxy, dùng thẳng cdn.pixabay.com |
+| MatchMode timer drift khi chơi ván mới | `start` dùng `useState` không reset được | Đổi sang `useRef`, reset trong `newRound()` |
 
 ---
 
