@@ -2,6 +2,7 @@ import Link from "next/link";
 import { COURSES } from "@/lib/courses";
 import { getLessons, countCards, getAllCards } from "@/lib/vocab";
 import SearchBox from "@/components/SearchBox";
+import HomeClient from "@/components/HomeClient";
 
 export default function Home() {
   const allCards = getAllCards();
@@ -28,6 +29,9 @@ export default function Home() {
           </span>
         </div>
       </header>
+
+      {/* Quick actions: streak, due, continue, stats */}
+      <HomeClient allCards={allCards} />
 
       {/* Search */}
       <div className="mb-10">

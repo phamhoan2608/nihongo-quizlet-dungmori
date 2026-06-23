@@ -97,6 +97,8 @@ export function getAllProgress(): Store {
  * Box 5 is only reachable via markMastered().
  */
 export function grade(id: number, g: Grade, source: GradeSource = "exercise"): CardProgress {
+  incrementDailyCount();
+  recordStudyToday();
   const store = read();
   const p = store[id] ?? fresh();
   const now = Date.now();
@@ -222,14 +224,134 @@ export function clearSessionPos(key: string): void {
   }
 }
 
+// ── Due cards (SRS review) ─────────────────────────────────────────────────
+
+/** Return cards that are due for review (box > 0 and due <= now). */
+export function getDueCards(cards: Card[]): Card[] {
+  const store = read();
+  const now = Date.now();
+  return cards.filter((c) => {
+    const p = store[c.id];
+    return p && p.reps > 0 && effectiveBox(p) > 0 && p.due <= now;
+  });
+}
+
+// ── Streak & daily count ───────────────────────────────────────────────────
+
+const STREAK_KEY = "minna-streak-v1";
+const DAILY_KEY  = "minna-daily-v1";
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export interface StreakInfo {
+  streak: number;
+  lastDate: string;
+}
+
+export function getStreakInfo(): StreakInfo {
+  if (typeof window === "undefined") return { streak: 0, lastDate: "" };
+  try {
+    return JSON.parse(localStorage.getItem(STREAK_KEY) || "{}") as StreakInfo;
+  } catch {
+    return { streak: 0, lastDate: "" };
+  }
+}
+
+/** Call once per day when the user studies at least one card. */
+export function recordStudyToday(): void {
+  if (typeof window === "undefined") return;
+  const today = todayStr();
+  const data = getStreakInfo();
+  if (data.lastDate === today) return;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = yesterday.toISOString().slice(0, 10);
+  const newStreak = data.lastDate === yStr ? data.streak + 1 : 1;
+  localStorage.setItem(STREAK_KEY, JSON.stringify({ streak: newStreak, lastDate: today }));
+}
+
+/** Increment the count of cards studied today. */
+export function incrementDailyCount(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const daily = JSON.parse(localStorage.getItem(DAILY_KEY) || "{}") as Record<string, number>;
+    const today = todayStr();
+    daily[today] = (daily[today] ?? 0) + 1;
+    localStorage.setItem(DAILY_KEY, JSON.stringify(daily));
+  } catch {}
+}
+
+/** Last 7 days of study counts for the activity chart. */
+export function getWeeklyActivity(): Array<{ date: string; count: number }> {
+  if (typeof window === "undefined") return [];
+  try {
+    const daily = JSON.parse(localStorage.getItem(DAILY_KEY) || "{}") as Record<string, number>;
+    const result: Array<{ date: string; count: number }> = [];
+    for (let offset = 6; offset >= 0; offset--) {
+      const d = new Date();
+      d.setDate(d.getDate() - offset);
+      const date = d.toISOString().slice(0, 10);
+      result.push({ date, count: daily[date] ?? 0 });
+    }
+    return result;
+  } catch { return []; }
+}
+
+export function getTodayCount(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const daily = JSON.parse(localStorage.getItem(DAILY_KEY) || "{}") as Record<string, number>;
+    return daily[todayStr()] ?? 0;
+  } catch { return 0; }
+}
+
+// ── Last studied ───────────────────────────────────────────────────────────
+
+const LAST_STUDIED_KEY = "minna-last-studied-v1";
+
+export interface LastStudied {
+  course: string;
+  lesson: number;
+  section: string;
+}
+
+export function saveLastStudied(info: LastStudied): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LAST_STUDIED_KEY, JSON.stringify(info));
+}
+
+export function loadLastStudied(): LastStudied | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = localStorage.getItem(LAST_STUDIED_KEY);
+    return v ? (JSON.parse(v) as LastStudied) : null;
+  } catch { return null; }
+}
+
+// ── Persistent onlyVocab filter ────────────────────────────────────────────
+
+const ONLY_VOCAB_KEY = "minna-only-vocab-v1";
+
+export function getOnlyVocab(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(ONLY_VOCAB_KEY) === "true";
+}
+
+export function setOnlyVocabPref(v: boolean): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ONLY_VOCAB_KEY, String(v));
+}
+
 // ── Auto-play setting ─────────────────────────────────────────────────────
 
 const AUTOPLAY_KEY = "minna-autoplay-v1";
 
 export function getAutoPlay(): boolean {
-  if (typeof window === "undefined") return true;
+  if (typeof window === "undefined") return false;
   const v = localStorage.getItem(AUTOPLAY_KEY);
-  return v === null ? true : v === "true"; // default: on
+  return v === null ? false : v === "true"; // default: off
 }
 
 export function setAutoPlay(v: boolean): void {

@@ -8,6 +8,8 @@ import {
   saveSessionMode, loadSessionMode,
   saveSessionSection, loadSessionSection,
   clearSessionPos, lessonStats,
+  getOnlyVocab, setOnlyVocabPref,
+  saveLastStudied,
 } from "@/lib/storage";
 import FlashcardMode from "./FlashcardMode";
 import QuizMode from "./QuizMode";
@@ -137,9 +139,11 @@ export default function StudySession({
   const [section, setSection] = useState<string | null>(null);
   const [onlyVocab, setOnlyVocab] = useState(false);
   const [autoPlay, setAutoPlayState] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     setAutoPlayState(getAutoPlay());
+    setOnlyVocab(getOnlyVocab());
     const savedSection = loadSessionSection(sessionKey);
     if (savedSection) {
       setSection(savedSection);
@@ -188,6 +192,15 @@ export default function StudySession({
   }, [cards, section, onlyVocab]);
 
   const deckKey = `${mode}-${section}-${onlyVocab}-${filtered.length}`;
+  const currentMode = MODES.find((m) => m.id === mode);
+
+  // Close mode menu when clicking outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [menuOpen]);
 
   // ── Section picker ────────────────────────────────────────────────────────
   if (!section) {
@@ -210,7 +223,7 @@ export default function StudySession({
             return (
               <button
                 key={id}
-                onClick={() => { setSection(id); saveSessionSection(sessionKey, id); }}
+                onClick={() => { setSection(id); saveSessionSection(sessionKey, id); saveLastStudied({ course, lesson, section: id }); }}
                 className="group flex flex-col rounded-2xl border border-line bg-card p-6 text-left shadow-card transition hover:-translate-y-1 hover:border-indigo hover:shadow-lift"
               >
                 <p className="text-xs font-semibold uppercase tracking-widest text-sub">Phần</p>
@@ -282,13 +295,67 @@ export default function StudySession({
       {/* Header */}
       <div className="flex flex-none items-center justify-between gap-2 pt-3 pb-2">
         <div className="flex min-w-0 items-center gap-2">
+          {/* Back to section picker */}
           <button
-            onClick={() => setMode(null)}
-            className="text-sm font-semibold text-indigo hover:underline"
+            onClick={() => { setMode(null); setSection(null); saveSessionSection(sessionKey, ""); }}
+            className="shrink-0 text-sm font-semibold text-indigo hover:underline"
           >
             ← Phần {section}
           </button>
-          <span className="truncate text-sm text-sub">· {filtered.length} thẻ</span>
+
+          <span className="text-sub/40">·</span>
+
+          {/* Mode dropdown */}
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-semibold transition ${
+                menuOpen
+                  ? "border-indigo bg-indigo-soft text-indigo"
+                  : "border-line bg-card text-ink hover:border-indigo hover:bg-indigo-soft hover:text-indigo"
+              }`}
+            >
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center [&_svg]:h-3.5 [&_svg]:w-3.5">
+                {currentMode?.icon}
+              </span>
+              <span className="hidden sm:inline">{currentMode?.label}</span>
+              <svg
+                width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                className={`shrink-0 transition-transform ${menuOpen ? "rotate-180" : ""}`}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1.5 min-w-[200px] overflow-hidden rounded-2xl border border-line bg-card py-1.5 shadow-lift">
+                {MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => { pickMode(m.id); setMenuOpen(false); }}
+                    className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm transition ${
+                      mode === m.id
+                        ? "bg-indigo-soft font-semibold text-indigo"
+                        : "text-ink hover:bg-indigo-soft hover:text-indigo"
+                    }`}
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center [&_svg]:h-4 [&_svg]:w-4">
+                      {m.icon}
+                    </span>
+                    <span>{m.label}</span>
+                    {mode === m.id && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-auto shrink-0">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <span className="hidden truncate text-sm text-sub sm:inline">· {filtered.length} thẻ</span>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -319,7 +386,7 @@ export default function StudySession({
             <input
               type="checkbox"
               checked={onlyVocab}
-              onChange={(e) => setOnlyVocab(e.target.checked)}
+              onChange={(e) => { setOnlyVocab(e.target.checked); setOnlyVocabPref(e.target.checked); }}
               className="h-3.5 w-3.5 accent-indigo"
             />
             <span className="hidden sm:inline">Chỉ từ vựng</span>

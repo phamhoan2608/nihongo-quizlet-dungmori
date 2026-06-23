@@ -43,6 +43,7 @@ export default function TypingMode({ cards, autoPlay, sessionKey }: { cards: Car
   const [value, setValue] = useState("");
   const [state, setState] = useState<"idle" | "right" | "wrong">("idle");
   const [score, setScore] = useState(0);
+  const [hintUsed, setHintUsed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function TypingMode({ cards, autoPlay, sessionKey }: { cards: Car
     setValue("");
     setState("idle");
     setScore(0);
+    setHintUsed(false);
   }, [cards, answerMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -80,14 +82,26 @@ export default function TypingMode({ cards, autoPlay, sessionKey }: { cards: Car
         ? isKanaMatch(value, card.reading || card.word)
         : isMeaningMatch(value, card.meaning);
     setState(ok ? "right" : "wrong");
-    if (ok) setScore((s) => s + 1);
-    grade(card.id, ok ? "good" : "again", "exercise");
+    // Penalize hint usage: grade as "again" even if correct
+    if (ok && !hintUsed) setScore((s) => s + 1);
+    grade(card.id, ok && !hintUsed ? "good" : "again", "exercise");
   };
 
   const next = () => {
     setValue("");
     setState("idle");
+    setHintUsed(false);
     setI((x) => x + 1);
+  };
+
+  const showHint = () => {
+    if (hintUsed || state !== "idle") return;
+    setHintUsed(true);
+    const target = answerMode === "kana"
+      ? cleanReading(card?.reading || card?.word || "")
+      : card?.meaning ?? "";
+    setValue(target.charAt(0));
+    inputRef.current?.focus();
   };
 
   const restart = () => {
@@ -212,13 +226,25 @@ export default function TypingMode({ cards, autoPlay, sessionKey }: { cards: Car
         </p>
       )}
 
-      <button
-        onClick={state === "idle" ? check : next}
-        disabled={state === "idle" && !value.trim()}
-        className="mt-3 w-full rounded-xl bg-indigo py-3 font-semibold text-white transition hover:bg-indigo-deep disabled:opacity-40"
-      >
-        {state === "idle" ? "Kiểm tra" : i + 1 === deck.length ? "Xem kết quả" : "Tiếp theo"}
-      </button>
+      <div className="mt-3 flex gap-2">
+        {state === "idle" && (
+          <button
+            onClick={showHint}
+            disabled={hintUsed}
+            title="Gợi ý: hiện chữ đầu (bị tính sai)"
+            className="shrink-0 rounded-xl border border-line px-4 py-3 text-sm font-semibold text-sub transition hover:border-indigo hover:text-indigo disabled:opacity-30"
+          >
+            Gợi ý
+          </button>
+        )}
+        <button
+          onClick={state === "idle" ? check : next}
+          disabled={state === "idle" && !value.trim()}
+          className="flex-1 rounded-xl bg-indigo py-3 font-semibold text-white transition hover:bg-indigo-deep disabled:opacity-40"
+        >
+          {state === "idle" ? "Kiểm tra" : i + 1 === deck.length ? "Xem kết quả" : "Tiếp theo"}
+        </button>
+      </div>
     </div>
   );
 }

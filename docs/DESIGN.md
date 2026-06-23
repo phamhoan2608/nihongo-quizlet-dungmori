@@ -1,6 +1,6 @@
 # Thiết kế tính năng — Nihongo Quizlet
 
-> Cập nhật lần cuối: 2026-06-21
+> Cập nhật lần cuối: 2026-06-23
 
 ---
 
@@ -14,6 +14,7 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 - Hiển thị danh sách cấp độ (hiện có: N5)
 - Mỗi cấp độ hiển thị tổng số thẻ, số bài
 - Ô tìm kiếm toàn bộ từ vựng (`SearchBox`)
+- **Quick-action bar** (`HomeClient`): streak 🔥, số thẻ hôm nay, nút "Ôn tập hôm nay" (nếu có từ đến hạn), nút "Tiếp tục" (bài/phần học gần nhất), link thống kê
 - Thông báo: tiến độ lưu trên trình duyệt, chưa đồng bộ tài khoản
 
 ### 1.2 Trang danh sách bài (`/n5`)
@@ -29,15 +30,16 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 - Bắt buộc chọn phần trước khi vào học (không có chế độ "học cả bài")
 
 ### 1.4 Màn hình chọn chế độ
-- Hiển thị sau khi chọn phần
-- Lưới 2–4 cột, mỗi ô: icon riêng + tên + mô tả ngắn
+- Hiển thị sau khi chọn phần (lần đầu vào, hoặc khi chưa có session)
+- Lưới 2–4 cột, mỗi ô: icon riêng (màu theo nhóm) + tên + mô tả ngắn
 - 7 chế độ: Lật thẻ / Trắc nghiệm / Nối cặp / Gõ đáp án / Nghe / Chính tả / Kiểm tra
 - Reload trang → khôi phục đúng phần + chế độ đang học (bỏ qua màn chọn)
 
 ### 1.5 Giao diện học
-- Header: nút "← Phần X" (quay về chọn chế độ), số thẻ, toggle Tự phát âm, checkbox Chỉ từ vựng, nút Đặt lại
-- Mode tabs: icon + tên, cuộn ngang trên mobile, bấm để chuyển chế độ ngay
-- Nội dung học thay đổi theo mode
+- **Header**: `← Phần X` (quay về section picker) · Dropdown chế độ (icon + tên + chevron) · số thẻ · toggle Tự phát âm · checkbox Chỉ từ vựng · Đặt lại
+- **Dropdown chế độ**: danh sách 7 chế độ với icon, chế độ hiện tại có dấu ✓, bấm để chuyển ngay; bấm ngoài để đóng
+- Không có tab bar — chế độ được chuyển hoàn toàn qua dropdown trong header
+- Nội dung học thay đổi theo chế độ đang chọn
 
 ---
 
@@ -45,14 +47,17 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 
 ### 2.1 Lật thẻ (Flashcard)
 - Lật thẻ để xem nghĩa (click / Space)
-- Nút **→** và Enter/ArrowRight: sang từ tiếp theo ngay (không cần lật trước)
 - Nút **←** / ArrowLeft: từ trước
-- Không có grading buttons — level không được tính từ chế độ này
+- Sau khi lật: hiển thị **"Chưa nhớ ✗"** (shu) và **"Nhớ rồi ✓"** (moss) thay cho nút "Tiếp theo"
+  - "Nhớ rồi" → `grade("good", "flashcard")` rồi sang thẻ kế
+  - "Chưa nhớ" → `grade("again", "flashcard")` rồi sang thẻ kế
+  - Cả hai đều ghi `incrementDailyCount` + `recordStudyToday` (thông qua `grade()`)
 - Level badge hiển thị trên thẻ (thông tin, không tương tác)
 - Thẻ hiển thị: kana, kanji (nếu khác), romaji, ảnh minh họa (nếu có), nút phát âm
 
 ### 2.2 Trắc nghiệm (Quiz)
 - 4 lựa chọn đáp án, chọn nghĩa đúng của từ
+- **Smart distractors**: ưu tiên chọn từ cùng POS trước, fallback sang POS khác — tránh đáp án quá dễ loại
 - Phím tắt: 1–4 chọn đáp án, Enter sang câu tiếp
 - Tự phát âm: phát âm từ khi sang câu mới (nếu bật)
 - **Tính level**: đúng → +1, sai → -1
@@ -65,7 +70,8 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 ### 2.4 Gõ đáp án (Typing)
 - Gõ reading (kana) hoặc nghĩa tiếng Việt
 - Chấp nhận gần đúng (so sánh không phân biệt hoa thường, dấu câu)
-- **Tính level**: đúng → +1, sai → -1
+- **Hint**: nút "Gợi ý" hiện chữ đầu tiên của đáp án → bị tính sai ngay cả khi đáp án đúng
+- **Tính level**: đúng (không dùng hint) → +1, sai hoặc dùng hint → -1
 
 ### 2.5 Nghe (Listen)
 - Phát âm từ tự động, chọn nghĩa đúng trong 4 lựa chọn
@@ -80,7 +86,8 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 - Ẩn chữ Nhật cho đến khi trả lời
 - Nút phát lại (R sau khi trả lời)
 - So sánh exact kana (hiragana/katakana)
-- **Tính level**: đúng → +1, sai → -1
+- **Hint**: nút "Gợi ý" hiện kana đầu tiên → bị tính sai ngay cả khi đáp án đúng
+- **Tính level**: đúng (không dùng hint) → +1, sai hoặc dùng hint → -1
 
 ### 2.7 Kiểm tra (Test)
 - Xen kẽ 2 dạng câu hỏi:
@@ -124,7 +131,11 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 - **Session position** (`minna-session`): lưu mode + thứ tự deck + vị trí card hiện tại theo từng bài-phần
   - Reload trang → tiếp tục đúng từ đang học, đúng thứ tự (deck order được lưu lần đầu và giữ nguyên)
   - Mỗi bài-phần có session riêng biệt
-- **AutoPlay setting** (`minna-autoplay-v1`): lưu trạng thái bật/tắt tự phát âm
+- **AutoPlay setting** (`minna-autoplay-v1`): lưu trạng thái bật/tắt tự phát âm (mặc định: tắt)
+- **Streak** (`minna-streak-v1`): `{ streak: number, lastDate: "YYYY-MM-DD" }` — tự cộng mỗi ngày học
+- **Daily count** (`minna-daily-v1`): `{ "YYYY-MM-DD": N }` — số thẻ graded mỗi ngày (dùng cho thống kê)
+- **Last studied** (`minna-last-studied-v1`): `{ course, lesson, section }` — để hiển thị nút "Tiếp tục"
+- **onlyVocab** (`minna-only-vocab-v1`): lưu bộ lọc "Chỉ từ vựng" giữa các phiên
 - Tất cả lưu trong `localStorage` của trình duyệt — không đồng bộ giữa thiết bị
 
 ---
@@ -162,6 +173,18 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 
 ---
 
+## 9. Theme & Dark Mode
+
+- **Hệ thống màu**: CSS custom properties (`--c-*`) với giá trị RGB dạng `R G B` (không có `rgb()`) để Tailwind opacity modifier hoạt động (`bg-moss/10`)
+- **Light mode**: nền `#F4F4FB` (trắng ngả tím nhẹ), indigo `#4F52C8`, shu `#E04040`, moss `#1A9E68`
+- **Dark / Night mode**: nền `#08081 4`, card `#12122A`, sub text `#ACA8D0` (đảm bảo contrast ≥ 5:1 kể cả khi dùng opacity `/60`)
+- **Toggle**: nút pill "☽ Tối / ☀ Sáng" fixed bottom-right, hiện trên mọi trang
+- **Lưu preference**: `localStorage` key `theme` = `"dark"` | `"light"`
+- **Anti-flash**: inline script trong `<head>` chạy trước React hydrate, tránh trắng nháy
+- **Flashcard back** (dark mode): dùng `bg-[#24246E]` thay vì indigo sáng để giữ contrast với chữ trắng
+
+---
+
 ## Bugs đã sửa
 
 | Bug | Mô tả | Fix |
@@ -171,6 +194,30 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 | Session position sai khi reload | `prioritizeCards()` shuffle lại mỗi lần → deck order thay đổi | Lưu deck order vào localStorage, restore đúng thứ tự |
 | Ảnh bị 400 qua Next.js Image | URL chứa nested query params | Bỏ proxy, dùng thẳng cdn.pixabay.com |
 | MatchMode timer drift khi chơi ván mới | `start` dùng `useState` không reset được | Đổi sang `useRef`, reset trong `newRound()` |
+| Dark mode text contrast thấp | `--c-sub` quá tối, `sub/60` chỉ đạt 3.6:1 | Tăng `sub` lên `#ACA8D0`, `sub/60` đạt 5.2:1 |
+| Flashcard không hỗ trợ self-assess | Không có grading → SRS không học được từ chế độ lật thẻ | Thêm "Nhớ rồi ✓" / "Chưa nhớ ✗" sau khi lật, gọi `grade()` |
+| autoPlay mặc định bật | Phát âm tự động làm phiền khi mới vào | Đổi default `getAutoPlay()` thành `false` |
+| onlyVocab không được lưu | Mỗi lần vào lại phải tick lại | Lưu vào `minna-only-vocab-v1` localStorage |
+
+---
+
+---
+
+## 10. Ôn tập SRS (`/review`)
+
+- `getDueCards(allCards)`: lọc card có `reps > 0`, `box > 0`, `due ≤ now`
+- Component `ReviewSession`: chọn chế độ (Quiz / Gõ / Nghe / Chính tả) rồi học ngay
+- Không có section picker — tất cả từ đến hạn từ mọi bài/phần được gom chung
+- Nút "Ôn tập hôm nay (N từ)" hiển thị trên trang chủ khi `dueCount > 0`
+
+---
+
+## 11. Thống kê (`/stats`)
+
+- **Summary cards**: thẻ hôm nay · streak · đã học / tổng · độ chính xác
+- **Biểu đồ 7 ngày**: cột dọc per-day, dùng `minna-daily-v1`
+- **Phân bổ mức nhớ**: thanh ngang cho mỗi box (0–5) vs tổng thẻ
+- **Từ cần ôn thêm**: card có `reps ≥ 3` và `wrongRate` cao nhất, tối đa 20 từ
 
 ---
 
@@ -178,4 +225,3 @@ Trang chủ → Chọn cấp độ (N5) → Danh sách bài → Chọn phần (A
 
 - Đồng bộ tài khoản (multi-device)
 - Thêm N4, N3
-- Thống kê học tập (streak, biểu đồ tiến độ)

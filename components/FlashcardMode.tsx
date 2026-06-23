@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Card } from "@/lib/types";
-import { getProgress, getMemoryLevel, prioritizeCards, saveSessionCardId, loadSessionCardId, saveSessionDeck, loadSessionDeck } from "@/lib/storage";
+import { grade, getProgress, getMemoryLevel, prioritizeCards, saveSessionCardId, loadSessionCardId, saveSessionDeck, loadSessionDeck } from "@/lib/storage";
 import { speak } from "@/lib/tts";
 import Flashcard from "./Flashcard";
 
@@ -153,12 +153,20 @@ export default function FlashcardMode({
 
       <div className="mt-4">
         {flipped ? (
-          <button
-            onClick={goNext}
-            className="w-full rounded-xl bg-indigo py-3.5 font-semibold text-white transition hover:bg-indigo-deep"
-          >
-            Tiếp theo →
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => { grade(card.id, "again", "flashcard"); goNext(); }}
+              className="rounded-xl border-2 border-shu bg-shu-soft py-3.5 font-semibold text-shu transition hover:bg-shu hover:text-white"
+            >
+              Chưa nhớ ✗
+            </button>
+            <button
+              onClick={() => { grade(card.id, "good", "flashcard"); goNext(); }}
+              className="rounded-xl border-2 border-moss bg-moss/10 py-3.5 font-semibold text-moss transition hover:bg-moss hover:text-white"
+            >
+              Nhớ rồi ✓
+            </button>
+          </div>
         ) : (
           <button
             onClick={() => setFlipped(true)}

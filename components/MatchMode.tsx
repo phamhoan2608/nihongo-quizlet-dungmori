@@ -68,6 +68,8 @@ export default function MatchMode({ cards }: { cards: Card[] }) {
       grade(tile.cardId, "good", "exercise");
       setSel(null);
     } else {
+      grade(sel.cardId, "again", "exercise");
+      grade(tile.cardId, "again", "exercise");
       const keys = [sel.key, tile.key];
       setWrongKeys(keys);
       setTimeout(() => setWrongKeys([]), 450);

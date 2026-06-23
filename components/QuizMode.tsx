@@ -16,10 +16,14 @@ interface Q {
 function buildQuestions(cards: Card[]): Q[] {
   const pool = cards;
   return prioritizeCards(cards).map((card) => {
-    const distractors = sample(
-      pool.filter((c) => c.id !== card.id && c.meaning !== card.meaning),
-      3
-    ).map((c) => c.meaning);
+    const others = pool.filter((c) => c.id !== card.id && c.meaning !== card.meaning);
+    const samePOS = others.filter((c) => c.pos === card.pos);
+    const diffPOS = others.filter((c) => c.pos !== card.pos);
+    // Fill 3 distractor slots: prefer same POS for more realistic wrong answers
+    const needed = 3;
+    const fromSame = sample(samePOS, Math.min(needed, samePOS.length));
+    const fromDiff = sample(diffPOS, needed - fromSame.length);
+    const distractors = [...fromSame, ...fromDiff].map((c) => c.meaning);
     return { card, options: shuffle([card.meaning, ...distractors]) };
   });
 }
