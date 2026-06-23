@@ -9,7 +9,7 @@ export function generateStaticParams() {
   );
 }
 
-export default function StudyPage({
+export default function VocabLessonPage({
   params,
 }: {
   params: { course: string; lesson: string };

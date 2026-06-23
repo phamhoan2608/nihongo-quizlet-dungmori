@@ -9,14 +9,18 @@ export function generateStaticParams() {
   return COURSES.map((c) => ({ course: c.id }));
 }
 
+const FEATURES = [
+  { id: "vocab",   label: "Từ vựng",  ready: true  },
+  { id: "grammar", label: "Ngữ pháp", ready: false },
+  { id: "kanji",   label: "Kanji",    ready: false },
+] as const;
+
 export default function CoursePage({ params }: { params: { course: string } }) {
   const course = getCourse(params.course);
   if (!course) notFound();
 
   const lessons = getLessons(course.id);
   const total = countCards(course.id);
-
-  // All cards in this course, for search
   const courseCards = lessons.flatMap((info) => getCards(course.id, info.lesson));
 
   return (
@@ -29,13 +33,39 @@ export default function CoursePage({ params }: { params: { course: string } }) {
           {course.title} · {course.label}
         </p>
         <h1 className="font-jp text-4xl font-bold tracking-tight text-ink sm:text-5xl">
-          Flashcards
+          {course.label}
         </h1>
         <p className="mt-3 max-w-xl text-sub">
-          {total} từ vựng &amp; mẫu câu. Chọn một bài để luyện bằng lật thẻ, trắc nghiệm,
-          nối cặp hoặc gõ đáp án. Tiến độ được lưu ngay trên máy.
+          Chọn nội dung muốn học: từ vựng, ngữ pháp hoặc kanji.
         </p>
       </header>
+
+      {/* Feature tabs */}
+      <div className="mb-10 flex gap-2 border-b border-line pb-0">
+        {FEATURES.map((f) => (
+          f.ready ? (
+            <div
+              key={f.id}
+              className="flex items-center gap-1.5 border-b-2 border-indigo px-4 pb-3 text-sm font-semibold text-indigo"
+            >
+              {f.label}
+            </div>
+          ) : (
+            <div
+              key={f.id}
+              className="flex items-center gap-1.5 border-b-2 border-transparent px-4 pb-3 text-sm font-semibold text-sub/50"
+            >
+              {f.label}
+              <span className="rounded-full bg-line px-1.5 py-0.5 text-[10px] font-semibold text-sub">
+                Sắp có
+              </span>
+            </div>
+          )
+        ))}
+      </div>
+
+      {/* Vocab content */}
+      <p className="mb-4 text-sm text-sub">{total} thẻ · {lessons.length} bài</p>
 
       <div className="mb-10">
         <SearchBox cards={courseCards} />

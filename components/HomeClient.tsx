@@ -62,7 +62,7 @@ export default function HomeClient({ allCards }: Props) {
       {/* Continue studying */}
       {lastStudied && (
         <Link
-          href={`/${lastStudied.course}/${lastStudied.lesson}`}
+          href={`/${lastStudied.course}/vocab/${lastStudied.lesson}`}
           className="group flex items-center gap-2 rounded-xl border border-indigo bg-indigo-soft px-4 py-2.5 shadow-card transition hover:bg-indigo"
         >
           <span className="text-lg">▶</span>

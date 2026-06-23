@@ -19,7 +19,7 @@ export default function LessonCard({ info }: { info: LessonInfo }) {
 
   return (
     <Link
-      href={`/${info.course}/${info.lesson}`}
+      href={`/${info.course}/vocab/${info.lesson}`}
       className="group relative flex flex-col rounded-2xl border border-line bg-card p-5 shadow-card transition hover:-translate-y-1 hover:shadow-lift"
     >
       <div className="flex items-start justify-between">
