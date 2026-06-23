@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 
-const anthropic = new Anthropic();
+const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export interface WritingResult {
   sentences: { text: string; correct: boolean; note: string }[];
@@ -51,16 +51,11 @@ Quy tắc:
 - "score": 1-10, dựa trên ngữ pháp + số từ dùng đúng + độ tự nhiên
 - "feedback": khuyến khích, bằng tiếng Việt`;
 
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const model = genai.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const response = await model.generateContent(prompt);
+    const raw = response.response.text();
 
-    const raw = message.content[0];
-    if (raw.type !== "text") throw new Error("Unexpected response type");
-
-    const jsonMatch = raw.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
 
     const result: WritingResult = JSON.parse(jsonMatch[0]);

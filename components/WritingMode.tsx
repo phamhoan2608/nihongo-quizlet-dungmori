@@ -27,13 +27,17 @@ export default function WritingMode({ cards }: { cards: Card[] }) {
   const topic = TOPICS[words[0]?.lesson] ?? "Chủ đề tự do";
   const minWords = Math.max(3, Math.floor(WORD_COUNT * 0.5));
 
+  const LIMIT = 3;
+  const STORAGE_KEY = "writing_check_count";
+
   const [text, setText] = useState("");
   const [result, setResult] = useState<WritingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usageCount, setUsageCount] = useState(() => Number(localStorage.getItem(STORAGE_KEY) ?? 0));
 
   const submit = async () => {
-    if (!text.trim() || loading) return;
+    if (!text.trim() || loading || usageCount >= LIMIT) return;
     setLoading(true);
     setError(null);
     try {
@@ -44,6 +48,9 @@ export default function WritingMode({ cards }: { cards: Card[] }) {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+      const next = usageCount + 1;
+      localStorage.setItem(STORAGE_KEY, String(next));
+      setUsageCount(next);
       setResult(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Lỗi không xác định");
@@ -173,17 +180,25 @@ export default function WritingMode({ cards }: { cards: Card[] }) {
         <p className="rounded-lg bg-shu-soft px-4 py-2 text-sm text-shu">{error}</p>
       )}
 
-      <button
-        onClick={submit}
-        disabled={!text.trim() || loading}
-        className="w-full rounded-xl bg-indigo py-3 font-semibold text-white transition hover:bg-indigo-deep disabled:opacity-40"
-      >
-        {loading ? "Đang chấm bài…" : "Nộp bài"}
-      </button>
-
-      <p className="text-center text-xs text-sub/50">
-        Bài được chấm bằng AI · Kết quả chỉ mang tính tham khảo
-      </p>
+      {usageCount >= LIMIT ? (
+        <div className="rounded-xl border border-line bg-card p-4 text-center">
+          <p className="font-semibold text-ink">Đã dùng hết {LIMIT} lượt chấm bài</p>
+          <p className="mt-1 text-sm text-sub">Mỗi trình duyệt chỉ được chấm {LIMIT} lần.</p>
+        </div>
+      ) : (
+        <>
+          <button
+            onClick={submit}
+            disabled={!text.trim() || loading}
+            className="w-full rounded-xl bg-indigo py-3 font-semibold text-white transition hover:bg-indigo-deep disabled:opacity-40"
+          >
+            {loading ? "Đang chấm bài…" : `Nộp bài (còn ${LIMIT - usageCount} lượt)`}
+          </button>
+          <p className="text-center text-xs text-sub/50">
+            Bài được chấm bằng AI · Kết quả chỉ mang tính tham khảo
+          </p>
+        </>
+      )}
     </div>
   );
 }
