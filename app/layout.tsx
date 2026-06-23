@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ThemeToggle from "@/components/ThemeToggle";
+import HomeButton from "@/components/HomeButton";
 
 export const metadata: Metadata = {
   title: "Minna Flashcards",
@@ -31,6 +32,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen font-sans antialiased">
         {children}
+        <HomeButton />
         <ThemeToggle />
       </body>
     </html>

@@ -295,18 +295,6 @@ export default function StudySession({
       {/* Header */}
       <div className="flex flex-none items-center justify-between gap-2 pt-3 pb-2">
         <div className="flex min-w-0 items-center gap-2">
-          {/* Home */}
-          <Link
-            href="/"
-            title="Về trang chủ"
-            className="shrink-0 rounded-lg border border-line p-1.5 text-sub transition hover:border-indigo hover:text-indigo"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </Link>
-
           {/* Back to section picker */}
           <button
             onClick={() => { setMode(null); setSection(null); saveSessionSection(sessionKey, ""); }}
