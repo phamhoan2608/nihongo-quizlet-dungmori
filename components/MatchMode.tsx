@@ -14,7 +14,7 @@ interface Tile {
   text: string;
 }
 
-const ROUND = 6;
+const ROUND = 10;
 
 function buildTiles(cards: Card[]): Tile[] {
   const chosen = prioritizeCards(cards).slice(0, Math.min(ROUND, cards.length));

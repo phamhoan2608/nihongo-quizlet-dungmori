@@ -75,6 +75,16 @@ export default function TypingMode({ cards, autoPlay, sessionKey }: { cards: Car
     return () => clearTimeout(t);
   }, [i, autoPlay, deck.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Enter to advance when input is disabled (after answering)
+  useEffect(() => {
+    if (state === "idle" || finished) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") { e.preventDefault(); next(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [state, finished]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const check = () => {
     if (state !== "idle" || !value.trim()) return;
     const ok =

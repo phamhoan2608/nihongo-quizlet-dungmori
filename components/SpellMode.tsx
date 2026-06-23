@@ -36,24 +36,25 @@ export default function SpellMode({ cards }: { cards: Card[] }) {
   const finished = deck.length > 0 && i >= deck.length;
 
   useEffect(() => {
-    if (!card || finished) return;
-    const t = setTimeout(() => speak(card.reading || card.word), 400);
+    if (!card) return;
+    const t = setTimeout(() => speak(card.reading || card.word), 200);
     return () => clearTimeout(t);
-  }, [i, deck.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [card?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!finished) inputRef.current?.focus();
   }, [i, finished]);
 
-  // Replay with R key when input is disabled (after answering)
+  // R replay + Enter next when input is disabled (after answering)
   useEffect(() => {
     if (state === "idle" || !card) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "r" || e.key === "R") { e.preventDefault(); speak(card.reading || card.word); }
+      if (e.key === "Enter") { e.preventDefault(); next(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [state, card]);
+  }, [state, card]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const check = () => {
     if (state !== "idle" || !value.trim() || !card) return;
