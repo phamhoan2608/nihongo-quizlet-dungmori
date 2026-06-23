@@ -11,6 +11,7 @@
     "fetch-images:reset": "node scripts/fetch-images.mjs --reset"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
     "next": "^14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
