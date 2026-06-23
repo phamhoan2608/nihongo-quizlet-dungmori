@@ -205,7 +205,7 @@ export default function StudySession({
   // ── Section picker ────────────────────────────────────────────────────────
   if (!section) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col px-5 py-10">
+      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col px-5 pb-10">
         <Link
           href={`/${course}`}
           className="mb-8 flex items-center gap-2 text-sm font-semibold text-indigo hover:underline"
@@ -258,7 +258,7 @@ export default function StudySession({
   // ── Mode picker ───────────────────────────────────────────────────────────
   if (!mode) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col px-5 py-10">
+      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col px-5 pb-10">
         <button
           onClick={() => { setSection(null); saveSessionSection(sessionKey, ""); }}
           className="mb-8 flex items-center gap-2 text-sm font-semibold text-indigo hover:underline"
@@ -290,7 +290,7 @@ export default function StudySession({
 
   // ── Study interface ───────────────────────────────────────────────────────
   return (
-    <main className="mx-auto flex h-dvh max-w-5xl flex-col px-4">
+    <main className="mx-auto flex h-[calc(100dvh-3.5rem)] max-w-5xl flex-col px-4">
 
       {/* Header */}
       <div className="flex flex-none items-center justify-between gap-2 pt-3 pb-2">

@@ -113,7 +113,7 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
   // ── Mode picker ───────────────────────────────────────────────────────────
   if (!mode) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col px-5 py-10">
+      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col px-5 pb-10">
         <Link
           href="/"
           className="mb-8 flex items-center gap-2 text-sm font-semibold text-indigo hover:underline"
@@ -166,7 +166,7 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
 
   // ── Study view ────────────────────────────────────────────────────────────
   return (
-    <main className="mx-auto flex h-dvh max-w-5xl flex-col px-4">
+    <main className="mx-auto flex h-[calc(100dvh-3.5rem)] max-w-5xl flex-col px-4">
       <div className="flex flex-none items-center justify-between gap-2 pt-3 pb-2">
         <div className="flex min-w-0 items-center gap-2">
           <button

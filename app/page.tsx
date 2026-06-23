@@ -8,7 +8,7 @@ export default function Home() {
   const allCards = getAllCards();
 
   return (
-    <main className="mx-auto max-w-5xl px-5 py-10 sm:py-16">
+    <main className="mx-auto max-w-5xl px-5 pb-10 sm:pb-16">
       <header className="mb-8 sm:mb-12">
         <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-shu">
           みんなの日本語 · Flashcards

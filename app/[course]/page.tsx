@@ -24,7 +24,7 @@ export default function CoursePage({ params }: { params: { course: string } }) {
   const courseCards = lessons.flatMap((info) => getCards(course.id, info.lesson));
 
   return (
-    <main className="mx-auto max-w-5xl px-5 py-10 sm:py-16">
+    <main className="mx-auto max-w-5xl px-5 pb-10 sm:pb-16">
       <header className="mb-8 sm:mb-12">
         <Link href="/" className="text-sm font-semibold text-indigo hover:underline">
           ← Tất cả cấp độ

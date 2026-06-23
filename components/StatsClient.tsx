@@ -75,7 +75,7 @@ export default function StatsClient() {
   const dayLabels = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-10">
+    <main className="mx-auto max-w-3xl px-5 pb-10">
       <Link href="/" className="mb-8 flex items-center gap-2 text-sm font-semibold text-indigo hover:underline">
         <span>←</span> Trang chủ
       </Link>
