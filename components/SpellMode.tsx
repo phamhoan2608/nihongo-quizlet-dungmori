@@ -50,7 +50,7 @@ export default function SpellMode({ cards }: { cards: Card[] }) {
     if (state === "idle" || !card) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "r" || e.key === "R") { e.preventDefault(); speak(card.reading || card.word); }
-      if (e.key === "Enter") { e.preventDefault(); next(); }
+      if (e.key === "Enter" && state === "right") { e.preventDefault(); next(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -155,7 +155,10 @@ export default function SpellMode({ cards }: { cards: Card[] }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") state === "idle" ? check() : next();
+          if (e.key === "Enter") {
+            if (state === "idle") check();
+            else if (state === "right") next();
+          }
         }}
         disabled={state !== "idle"}
         placeholder="Nhập hiragana / katakana rồi nhấn Enter"
