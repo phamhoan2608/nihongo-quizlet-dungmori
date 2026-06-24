@@ -107,6 +107,16 @@ export default function TestMode({ cards }: { cards: Card[] }) {
     setWrongs([]);
   };
 
+  // Enter to advance for typing questions after answering
+  useEffect(() => {
+    if (!q || q.qtype !== "typing" || typingState === "idle" || finished) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") { e.preventDefault(); next(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [q, typingState, finished, next]);
+
   // Keyboard shortcuts for MC
   useEffect(() => {
     if (!q || q.qtype !== "mc" || finished) return;
