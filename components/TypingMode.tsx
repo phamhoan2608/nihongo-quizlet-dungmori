@@ -25,7 +25,7 @@ function isMeaningMatch(input: string, meaning: string): boolean {
   const want = meaning.split(/[,/／;]/).map(normalize).filter(Boolean);
   const got = normalize(input);
   if (!got) return false;
-  return want.some((w) => w === got || w.includes(got) || got.includes(w));
+  return want.some((w) => w === got || got.includes(w));
 }
 
 // Exact kana match (hiragana or katakana typed directly).
