@@ -79,6 +79,8 @@ export default function TypingMode({ cards, autoPlay, sessionKey }: { cards: Car
   useEffect(() => {
     if (state === "idle" || finished) return;
     const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.isContentEditable) return;
       if (e.key === "Enter" && (state === "right" || state === "wrong")) { e.preventDefault(); next(); }
     };
     window.addEventListener("keydown", onKey);

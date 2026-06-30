@@ -43,6 +43,8 @@ export default function SpellMode({ cards }: { cards: Card[] }) {
   useEffect(() => {
     if (state === "idle" || !card) return;
     const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.isContentEditable) return;
       if (e.key === "r" || e.key === "R") { e.preventDefault(); speak(card.reading || card.word); }
       if (e.key === "Enter" && (state === "right" || state === "wrong")) { e.preventDefault(); next(); }
     };

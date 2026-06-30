@@ -78,7 +78,7 @@ export default function ListenMode({ cards, sessionKey }: { cards: Card[]; sessi
     if (finished || !q) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
+      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "BUTTON" || t.isContentEditable) return;
       if (!picked) {
         const idx = ["1", "2", "3", "4"].indexOf(e.key);
         if (idx !== -1 && q.options[idx]) { e.preventDefault(); choose(q.options[idx]); }
