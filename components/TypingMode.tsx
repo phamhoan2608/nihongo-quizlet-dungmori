@@ -75,11 +75,11 @@ export default function TypingMode({ cards, autoPlay, sessionKey }: { cards: Car
     return () => clearTimeout(t);
   }, [i, autoPlay, deck.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Enter to advance only when correct (wrong answer requires clicking button)
+  // Enter to advance after answering (both right and wrong)
   useEffect(() => {
     if (state === "idle" || finished) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && state === "right") { e.preventDefault(); next(); }
+      if (e.key === "Enter" && (state === "right" || state === "wrong")) { e.preventDefault(); next(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -213,12 +213,11 @@ export default function TypingMode({ cards, autoPlay, sessionKey }: { cards: Car
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            if (state === "idle") check();
-            else if (state === "right") next();
-          }
+          if (e.nativeEvent.isComposing) return;
+          if (e.key === "Enter" && state === "idle") check();
         }}
         disabled={state !== "idle"}
+        key={i}
         placeholder={
           answerMode === "kana"
             ? "Nhập hiragana / katakana rồi nhấn Enter"

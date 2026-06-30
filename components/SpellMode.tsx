@@ -36,21 +36,15 @@ export default function SpellMode({ cards }: { cards: Card[] }) {
   const finished = deck.length > 0 && i >= deck.length;
 
   useEffect(() => {
-    if (!card) return;
-    const t = setTimeout(() => speak(card.reading || card.word), 200);
-    return () => clearTimeout(t);
-  }, [card?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
     if (!finished) inputRef.current?.focus();
   }, [i, finished]);
 
-  // R replay + Enter next when input is disabled (after answering)
+  // R replay + Enter next when input is disabled (after answering, both right and wrong)
   useEffect(() => {
     if (state === "idle" || !card) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "r" || e.key === "R") { e.preventDefault(); speak(card.reading || card.word); }
-      if (e.key === "Enter" && state === "right") { e.preventDefault(); next(); }
+      if (e.key === "Enter" && (state === "right" || state === "wrong")) { e.preventDefault(); next(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -155,12 +149,11 @@ export default function SpellMode({ cards }: { cards: Card[] }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            if (state === "idle") check();
-            else if (state === "right") next();
-          }
+          if (e.nativeEvent.isComposing) return;
+          if (e.key === "Enter" && state === "idle") check();
         }}
         disabled={state !== "idle"}
+        key={i}
         placeholder="Nhập hiragana / katakana rồi nhấn Enter"
         className={`w-full rounded-xl border-2 bg-card px-4 py-3.5 font-jp text-lg outline-none transition ${
           state === "right"
