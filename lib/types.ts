@@ -1,5 +1,11 @@
 export type CardType = "vocab" | "expression";
 
+export interface Example {
+  jp: string;    // Câu tiếng Nhật
+  en?: string;   // Bản dịch tiếng Anh (từ Jisho/Tatoeba)
+  vi?: string;   // Bản dịch tiếng Việt
+}
+
 export interface Card {
   id: number;
   course: string;   // "n5", "n4", etc. — injected by lib/vocab.ts, not stored in JSON
@@ -12,6 +18,7 @@ export interface Card {
   meaning: string;
   note: string;
   image?: string;   // URL from data/images.json, merged at load time
+  examples?: Example[]; // Câu ví dụ from data/examples.json, merged at load time
 }
 
 export type Grade = "again" | "hard" | "good" | "easy";

@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import type { Card } from "@/lib/types";
+import { useEffect, useState } from "react";
+import type { Card, Example } from "@/lib/types";
 import type { MemoryLevelInfo } from "@/lib/storage";
 import { kanaToRomaji } from "@/lib/romaji";
 import Speaker from "./Speaker";
@@ -22,8 +23,39 @@ export default function Flashcard({
   const secondary = card.word !== card.reading ? card.word : null;
   const romaji = kanaToRomaji(primary);
 
+  // ── Examples ────────────────────────────────────────────────────────────
+  const [showExamples, setShowExamples] = useState(false);
+  const [examples, setExamples] = useState<Example[] | null>(card.examples ?? null);
+  const [loading, setLoading] = useState(false);
+  const hasCached = !!card.examples && card.examples.length > 0;
+
+  // Reset khi đổi thẻ
+  useEffect(() => {
+    setShowExamples(false);
+    setExamples(card.examples ?? null);
+    setLoading(false);
+  }, [card.id, card.examples]);
+
+  const toggleExamples = async () => {
+    if (showExamples) { setShowExamples(false); return; }
+    setShowExamples(true);
+    if (!examples || examples.length === 0) {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/example?word=${encodeURIComponent(card.word)}`);
+        const data = await res.json();
+        setExamples(data.examples ?? []);
+      } catch {
+        setExamples([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   return (
-    <div className="flip w-full">
+    <div className="w-full">
+      <div className="flip w-full">
       <div
         role="button"
         tabIndex={0}
@@ -98,6 +130,51 @@ export default function Flashcard({
           </div>
         </div>
       </div>
+      </div>
+
+      {/* Ví dụ câu — chỉ hiện khi lật thẻ */}
+      {flipped && (
+        <div className="mt-3">
+          <button
+            onClick={toggleExamples}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-indigo transition hover:border-indigo hover:bg-indigo-soft"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+            </svg>
+            {showExamples ? "Ẩn ví dụ" : hasCached ? "Xem ví dụ" : "Xem ví dụ (Tatoeba)"}
+          </button>
+
+          {showExamples && (
+            <div className="mt-2 animate-slide-up rounded-2xl border border-line bg-card p-4 shadow-card">
+              {loading && (
+                <p className="text-center text-sm text-sub">Đang tải…</p>
+              )}
+              {!loading && examples && examples.length === 0 && (
+                <p className="text-center text-sm text-sub">Chưa có ví dụ cho từ này.</p>
+              )}
+              {!loading && examples && examples.length > 0 && (
+                <ul className="space-y-3">
+                  {examples.map((ex, idx) => (
+                    <li key={idx} className="flex flex-col gap-1">
+                      <div className="flex items-start gap-2">
+                        <Speaker text={ex.jp} />
+                        <p className="font-jp text-base leading-relaxed text-ink">{ex.jp}</p>
+                      </div>
+                      {ex.vi && (
+                        <p className="pl-8 text-sm text-sub">{ex.vi}</p>
+                      )}
+                      {!ex.vi && ex.en && (
+                        <p className="pl-8 text-sm italic text-sub/80">{ex.en}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
