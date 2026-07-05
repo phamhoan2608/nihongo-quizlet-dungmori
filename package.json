@@ -10,7 +10,8 @@
     "fetch-images": "node scripts/fetch-images.mjs",
     "fetch-images:reset": "node scripts/fetch-images.mjs --reset",
     "fetch-examples": "node scripts/fetch-examples.mjs",
-    "fetch-examples:reset": "node scripts/fetch-examples.mjs --reset"
+    "fetch-examples:reset": "node scripts/fetch-examples.mjs --reset",
+    "fetch-examples:vi-refill": "node scripts/fetch-examples.mjs --vi-refill"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
