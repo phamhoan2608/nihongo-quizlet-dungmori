@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Card } from "@/lib/types";
 import { grade, getProgress, getMemoryLevel, prioritizeCards, saveSessionCardId, loadSessionCardId, saveSessionDeck, loadSessionDeck } from "@/lib/storage";
 import { speak } from "@/lib/tts";
+import { shuffle } from "@/lib/shuffle";
 import Flashcard from "./Flashcard";
 
 export default function FlashcardMode({
@@ -18,6 +19,8 @@ export default function FlashcardMode({
   const [deck, setDeck] = useState<Card[]>([]);
   const [i, setI] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [autoRun, setAutoRun] = useState(false);
+  const [shuffled, setShuffled] = useState(false);
 
   const card = deck[i];
   const finished = deck.length > 0 && i >= deck.length;
@@ -50,7 +53,33 @@ export default function FlashcardMode({
     setDeck(d);
     setI(0);
     setFlipped(false);
+    setShuffled(false);
+    setAutoRun(false);
   }, [buildDeck]);
+
+  const shuffleDeck = useCallback(() => {
+    setDeck((prev) => shuffle([...prev]));
+    setI(0);
+    setFlipped(false);
+    setShuffled(true);
+  }, []);
+
+  const toggleAutoRun = useCallback(() => setAutoRun((v) => !v), []);
+
+  // Auto-run: mặt trước ~3s → lật → mặt sau ~3s → next
+  useEffect(() => {
+    if (!autoRun || finished || deck.length === 0) return;
+    const t = setTimeout(() => {
+      if (!flipped) setFlipped(true);
+      else goNext();
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [autoRun, flipped, i, finished, deck.length, goNext]);
+
+  // Stop auto-run khi đã hoàn thành deck
+  useEffect(() => {
+    if (finished && autoRun) setAutoRun(false);
+  }, [finished, autoRun]);
 
   useEffect(() => {
     const newDeck = buildDeck();
@@ -81,11 +110,13 @@ export default function FlashcardMode({
         case "ArrowRight":
         case "Enter":      e.preventDefault(); goNext(); break;
         case " ":          e.preventDefault(); setFlipped((f) => !f); break;
+        case "p": case "P": e.preventDefault(); toggleAutoRun(); break;
+        case "s": case "S": e.preventDefault(); shuffleDeck(); break;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [finished, deck.length, goPrev, goNext]);
+  }, [finished, deck.length, goPrev, goNext, toggleAutoRun, shuffleDeck]);
 
   const progress = useMemo(
     () => Math.min(100, Math.round((i / Math.max(deck.length, 1)) * 100)),
@@ -112,31 +143,76 @@ export default function FlashcardMode({
   return (
     <div>
       {/* Counter + nav */}
-      <div className="mb-3 flex items-center gap-3 text-sm text-sub">
-        <button
-          onClick={goPrev}
-          disabled={i === 0}
-          aria-label="Thẻ trước"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-card transition hover:border-indigo hover:text-indigo disabled:opacity-30"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
+      <div className="mb-3 flex items-center justify-between gap-2 text-sm text-sub">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goPrev}
+            disabled={i === 0}
+            aria-label="Thẻ trước"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-card transition hover:border-indigo hover:text-indigo disabled:opacity-30"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
 
-        <span className="flex-1 text-center">{i + 1} / {deck.length}</span>
+          <span className="min-w-[3.5rem] text-center tabular-nums">{i + 1} / {deck.length}</span>
 
-        <button
-          onClick={goNext}
-          aria-label="Thẻ tiếp"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-card transition hover:border-indigo hover:text-indigo"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
+          <button
+            onClick={goNext}
+            aria-label="Thẻ tiếp"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-card transition hover:border-indigo hover:text-indigo"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
 
-        <span className="w-10 text-right">{progress}%</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={shuffleDeck}
+            title="Xáo trộn thẻ"
+            aria-label="Xáo trộn"
+            className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
+              shuffled
+                ? "border-indigo bg-indigo-soft text-indigo"
+                : "border-line bg-card hover:border-indigo hover:text-indigo"
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 3h5v5" />
+              <path d="M4 20L21 3" />
+              <path d="M21 16v5h-5" />
+              <path d="M15 15l6 6" />
+              <path d="M4 4l5 5" />
+            </svg>
+          </button>
+
+          <button
+            onClick={toggleAutoRun}
+            title={autoRun ? "Dừng tự chạy" : "Tự chạy (3s/thẻ)"}
+            aria-label={autoRun ? "Dừng" : "Tự chạy"}
+            className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${
+              autoRun
+                ? "border-indigo bg-indigo text-white"
+                : "border-line bg-card hover:border-indigo hover:text-indigo"
+            }`}
+          >
+            {autoRun ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <rect x="6" y="5" width="4" height="14" rx="1" />
+                <rect x="14" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <polygon points="6 4 20 12 6 20 6 4" />
+              </svg>
+            )}
+          </button>
+
+          <span className="w-10 text-right tabular-nums">{progress}%</span>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -178,7 +254,7 @@ export default function FlashcardMode({
       </div>
 
       <p className="mt-2 text-center text-xs text-sub/50">
-        ← → điều hướng · Space lật thẻ
+        ← → điều hướng · Space lật thẻ · P tự chạy · S xáo trộn
       </p>
     </div>
   );
