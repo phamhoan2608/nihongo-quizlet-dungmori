@@ -28,13 +28,38 @@ export default function WritingMode({ cards }: { cards: Card[] }) {
   const minWords = Math.max(3, Math.floor(WORD_COUNT * 0.5));
 
   const LIMIT = 3;
-  const STORAGE_KEY = "writing_check_count";
+  const STORAGE_KEY = "writing_check_daily";
+
+  // Trả về "YYYY-MM-DD" theo local time
+  const todayKey = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const loadDailyCount = (): number => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw) as { date: string; count: number };
+      if (parsed.date !== todayKey()) return 0; // ngày mới → reset
+      return parsed.count ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const saveDailyCount = (count: number) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: todayKey(), count }));
+  };
 
   const [text, setText] = useState("");
   const [result, setResult] = useState<WritingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usageCount, setUsageCount] = useState(() => Number(localStorage.getItem(STORAGE_KEY) ?? 0));
+  const [usageCount, setUsageCount] = useState(loadDailyCount);
 
   const submit = async () => {
     if (!text.trim() || loading || usageCount >= LIMIT) return;
@@ -48,8 +73,10 @@ export default function WritingMode({ cards }: { cards: Card[] }) {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      const next = usageCount + 1;
-      localStorage.setItem(STORAGE_KEY, String(next));
+      // Refetch (tránh race khi qua nửa đêm): nếu ngày đã sang, count reset về 0 rồi +1
+      const current = loadDailyCount();
+      const next = current + 1;
+      saveDailyCount(next);
       setUsageCount(next);
       setResult(data);
     } catch (e: unknown) {
@@ -182,8 +209,8 @@ export default function WritingMode({ cards }: { cards: Card[] }) {
 
       {usageCount >= LIMIT ? (
         <div className="rounded-xl border border-line bg-card p-4 text-center">
-          <p className="font-semibold text-ink">Đã dùng hết {LIMIT} lượt chấm bài</p>
-          <p className="mt-1 text-sm text-sub">Mỗi trình duyệt chỉ được chấm {LIMIT} lần.</p>
+          <p className="font-semibold text-ink">Đã dùng hết {LIMIT} lượt chấm bài hôm nay</p>
+          <p className="mt-1 text-sm text-sub">Reset vào 0h ngày mai. Mỗi ngày được chấm {LIMIT} lần.</p>
         </div>
       ) : (
         <>
@@ -192,10 +219,10 @@ export default function WritingMode({ cards }: { cards: Card[] }) {
             disabled={!text.trim() || loading}
             className="w-full rounded-xl bg-indigo py-3 font-semibold text-white transition hover:bg-indigo-deep disabled:opacity-40"
           >
-            {loading ? "Đang chấm bài…" : `Nộp bài (còn ${LIMIT - usageCount} lượt)`}
+            {loading ? "Đang chấm bài…" : `Nộp bài (còn ${LIMIT - usageCount}/${LIMIT} lượt hôm nay)`}
           </button>
           <p className="text-center text-xs text-sub/50">
-            Bài được chấm bằng AI · Kết quả chỉ mang tính tham khảo
+            Bài được chấm bằng AI · Kết quả chỉ mang tính tham khảo · Reset 0h mỗi ngày
           </p>
         </>
       )}
