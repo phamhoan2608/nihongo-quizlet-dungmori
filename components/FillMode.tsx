@@ -7,9 +7,13 @@ import { cleanReading } from "@/lib/romaji";
 import { speak } from "@/lib/tts";
 import Seal from "./Seal";
 
-interface Sentence { jp: string; vi: string; word: string; }
+interface Sentence {
+  jp: string;         // Câu với markup furigana + target <<>>
+  vi: string;         // Bản dịch
+  fromCache?: boolean;
+}
 
-// Fallback: chọn 1 câu từ examples cache của card
+// ── Fallback: chọn 1 câu từ examples cache ───────────────────────────────
 function fallbackFromExamples(card: Card): Sentence | null {
   if (!card.examples || card.examples.length === 0) return null;
   const pool = card.examples.filter(
@@ -17,95 +21,141 @@ function fallbackFromExamples(card: Card): Sentence | null {
   );
   if (pool.length === 0) return null;
   const ex = pool[Math.floor(Math.random() * pool.length)];
-  const word = ex.jp.includes(card.word) ? card.word : card.reading;
-  return { jp: ex.jp, vi: ex.vi ?? ex.en ?? "", word };
+  // Cache examples không có furigana markup, chỉ bọc target
+  const wordInSentence = ex.jp.includes(card.word) ? card.word : card.reading;
+  const jp = ex.jp.replace(wordInSentence, `<<${wordInSentence}>>`);
+  return { jp, vi: ex.vi ?? ex.en ?? "", fromCache: true };
 }
 
-function isCorrect(input: string, expected: string, altReading: string): boolean {
+// ── Parse sentence markup → segments ─────────────────────────────────────
+interface Segment {
+  text: string;
+  reading?: string;
+  isTarget?: boolean;
+}
+
+function parseSentence(jp: string): Segment[] {
+  const segs: Segment[] = [];
+  // Match ORDER matters: <<...>> first, then kanji[reading], then plain
+  const re = /<<([^>]+)>>|([一-龯々ヶ]+)\[([ぁ-んァ-ヶー]+)\]|([^\[\]<>]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(jp)) !== null) {
+    if (m[1] !== undefined) {
+      const inner = m[1];
+      // Target có thể là: kanji[reading] hoặc kana thuần
+      const kr = inner.match(/^([一-龯々ヶ]+)\[([ぁ-んァ-ヶー]+)\]$/);
+      if (kr) segs.push({ text: kr[1], reading: kr[2], isTarget: true });
+      else segs.push({ text: inner, isTarget: true });
+    } else if (m[2] !== undefined) {
+      segs.push({ text: m[2], reading: m[3] });
+    } else if (m[4] !== undefined) {
+      segs.push({ text: m[4] });
+    }
+  }
+  return segs;
+}
+
+// ── Answer check ─────────────────────────────────────────────────────────
+function isCorrect(input: string, targetSeg: Segment | undefined, card: Card): boolean {
   const got = input.trim();
-  if (!got) return false;
-  return got === expected || got === cleanReading(altReading).trim();
+  if (!got || !targetSeg) return false;
+  if (got === targetSeg.text) return true;
+  if (targetSeg.reading && got === targetSeg.reading) return true;
+  if (got === card.word) return true;
+  if (got === cleanReading(card.reading).trim()) return true;
+  return false;
 }
 
-export default function FillMode({ cards, sessionKey }: { cards: Card[]; sessionKey?: string }) {
+// ── Component ────────────────────────────────────────────────────────────
+export default function FillMode({ cards }: { cards: Card[]; sessionKey?: string }) {
   const [deck, setDeck] = useState<Card[]>([]);
   const [i, setI] = useState(0);
-  const [sentence, setSentence] = useState<Sentence | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sentences, setSentences] = useState<Map<number, Sentence | null>>(new Map());
+  const [preloadDone, setPreloadDone] = useState(0);
   const [value, setValue] = useState("");
   const [state, setState] = useState<"idle" | "right" | "wrong">("idle");
   const [score, setScore] = useState(0);
-  const [source, setSource] = useState<"gemini" | "cache">("gemini");
   const inputRef = useRef<HTMLInputElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  // Preload lesson vocab list (giới hạn 30 từ) để gửi kèm cho LLM
-  const lessonWords = cards
-    .filter((c) => c.type === "vocab")
-    .slice(0, 30)
-    .map((c) => `${c.word}(${c.reading})`);
 
   const card = deck[i];
   const finished = deck.length > 0 && i >= deck.length;
+  const currentSentence = card ? sentences.get(card.id) : undefined;
+  const segments = currentSentence ? parseSentence(currentSentence.jp) : [];
+  const targetSeg = segments.find((s) => s.isTarget);
 
+  // ── Preload tất cả câu trong section khi mount ──────────────────────────
   useEffect(() => {
-    setDeck(prioritizeCards(cards));
+    const newDeck = prioritizeCards(cards);
+    setDeck(newDeck);
     setI(0);
     setValue("");
     setState("idle");
     setScore(0);
-    setSentence(null);
+    setSentences(new Map());
+    setPreloadDone(0);
+
+    if (newDeck.length === 0) return;
+
+    const lessonWords = cards
+      .filter((c) => c.type === "vocab")
+      .slice(0, 25)
+      .map((c) => `${c.word}(${c.reading})`);
+
+    let cancelled = false;
+    let cursor = 0;
+    const CONCURRENCY = 3;
+
+    async function generateOne(c: Card): Promise<Sentence | null> {
+      try {
+        const res = await fetch("/api/fill-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            word: c.word,
+            reading: c.reading,
+            meaning: c.meaning,
+            lessonWords,
+          }),
+        });
+        if (!res.ok) return fallbackFromExamples(c);
+        const data = await res.json();
+        if (!data.jp) return fallbackFromExamples(c);
+        return { jp: data.jp, vi: data.vi };
+      } catch {
+        return fallbackFromExamples(c);
+      }
+    }
+
+    async function worker() {
+      while (!cancelled) {
+        const idx = cursor++;
+        if (idx >= newDeck.length) return;
+        const c = newDeck[idx];
+        const s = await generateOne(c);
+        if (cancelled) return;
+        setSentences((prev) => {
+          const next = new Map(prev);
+          next.set(c.id, s);
+          return next;
+        });
+        setPreloadDone((d) => d + 1);
+      }
+    }
+
+    Promise.all(Array(Math.min(CONCURRENCY, newDeck.length)).fill(0).map(() => worker()));
+
+    return () => {
+      cancelled = true;
+    };
   }, [cards]);
 
-  const generate = useCallback(async (c: Card) => {
-    setLoading(true);
-    setError(null);
-    setSentence(null);
-    abortRef.current?.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-    try {
-      const res = await fetch("/api/fill-generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          word: c.word,
-          reading: c.reading,
-          meaning: c.meaning,
-          lessonWords,
-        }),
-        signal: ctrl.signal,
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json();
-      const wordMatch = data.jp.includes(c.word) ? c.word : c.reading;
-      setSentence({ jp: data.jp, vi: data.vi, word: wordMatch });
-      setSource("gemini");
-    } catch (e) {
-      if ((e as Error).name === "AbortError") return;
-      // Fallback: dùng câu Tatoeba cache
-      const fb = fallbackFromExamples(c);
-      if (fb) {
-        setSentence(fb);
-        setSource("cache");
-      } else {
-        setError("Không tạo được câu ví dụ cho từ này.");
-      }
-    } finally {
-      setLoading(false);
+  // Focus input khi có câu
+  useEffect(() => {
+    if (currentSentence && !finished && state === "idle") {
+      const t = setTimeout(() => inputRef.current?.focus(), 100);
+      return () => clearTimeout(t);
     }
-  }, [lessonWords]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!card || finished) return;
-    generate(card);
-    return () => abortRef.current?.abort();
-  }, [card?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!loading && sentence && !finished) inputRef.current?.focus();
-  }, [loading, sentence, finished, i]);
+  }, [currentSentence, finished, state, i]);
 
   const next = useCallback(() => {
     setValue("");
@@ -114,27 +164,19 @@ export default function FillMode({ cards, sessionKey }: { cards: Card[]; session
   }, []);
 
   const check = () => {
-    if (state !== "idle" || !value.trim() || !sentence || !card) return;
-    const ok = isCorrect(value, sentence.word, card.reading);
+    if (state !== "idle" || !value.trim() || !card || !currentSentence || !targetSeg) return;
+    const ok = isCorrect(value, targetSeg, card);
     setState(ok ? "right" : "wrong");
     if (ok) setScore((s) => s + 1);
     grade(card.id, ok ? "good" : "again", "exercise");
   };
 
-  const skip = () => {
-    if (!card) return;
-    generate(card);
-    setValue("");
-    setState("idle");
-  };
-
   const restart = () => {
-    setDeck(prioritizeCards(cards));
+    // Giữ nguyên sentences cache, chỉ reset trạng thái
     setI(0);
     setValue("");
     setState("idle");
     setScore(0);
-    setSentence(null);
   };
 
   // Enter to advance after answering
@@ -171,22 +213,49 @@ export default function FillMode({ cards, sessionKey }: { cards: Card[]; session
   }
 
   const progress = Math.round((i / Math.max(deck.length, 1)) * 100);
+  const preloadPct = Math.round((preloadDone / deck.length) * 100);
+  const cardStillLoading = currentSentence === undefined;
 
-  // Split sentence around blanked word (chỉ blank khi state = idle)
+  // Render sentence with furigana + blanked target
   const renderSentence = () => {
-    if (!sentence) return null;
-    const parts = sentence.jp.split(sentence.word);
-    const blank = state === "idle"
-      ? <span className="mx-1 inline-block min-w-[3em] rounded border-b-2 border-dashed border-indigo px-2 text-center align-baseline text-indigo/70">?</span>
-      : <span className={`mx-1 rounded px-1 font-bold ${state === "right" ? "text-moss" : "text-shu"}`}>{sentence.word}</span>;
+    if (!currentSentence) return null;
+    // Bỏ ký tự khoảng trắng đầu segment ngôn ngữ Nhật
     return (
-      <p className="font-jp text-xl leading-relaxed text-ink sm:text-2xl">
-        {parts.map((p, idx) => (
-          <span key={idx}>
-            {p}
-            {idx < parts.length - 1 && blank}
-          </span>
-        ))}
+      <p className="font-jp text-2xl leading-[3.2rem] text-ink sm:text-3xl">
+        {segments.map((seg, idx) => {
+          if (seg.isTarget) {
+            if (state === "idle") {
+              return (
+                <span
+                  key={idx}
+                  className="mx-1 inline-block min-w-[3.5em] rounded border-b-2 border-dashed border-indigo px-2 pb-0.5 text-center align-baseline text-lg text-indigo/70"
+                >
+                  ?
+                </span>
+              );
+            }
+            const cls = state === "right" ? "text-moss" : "text-shu";
+            return (
+              <span key={idx} className={`mx-0.5 font-bold ${cls}`}>
+                {seg.reading ? (
+                  <ruby>
+                    {seg.text}
+                    <rt className="text-[0.5em] font-normal">{seg.reading}</rt>
+                  </ruby>
+                ) : seg.text}
+              </span>
+            );
+          }
+          if (seg.reading) {
+            return (
+              <ruby key={idx}>
+                {seg.text}
+                <rt className="text-[0.5em] text-sub">{seg.reading}</rt>
+              </ruby>
+            );
+          }
+          return <span key={idx}>{seg.text}</span>;
+        })}
       </p>
     );
   };
@@ -201,45 +270,45 @@ export default function FillMode({ cards, sessionKey }: { cards: Card[]; session
         <div className="h-full bg-indigo transition-all" style={{ width: `${progress}%` }} />
       </div>
 
+      {/* Preload progress bar */}
+      {preloadDone < deck.length && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-sub">
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo border-t-transparent" />
+          <span>Đang tải câu: {preloadDone}/{deck.length} ({preloadPct}%)</span>
+          <div className="ml-auto h-1 w-24 overflow-hidden rounded-full bg-line">
+            <div className="h-full bg-indigo transition-all" style={{ width: `${preloadPct}%` }} />
+          </div>
+        </div>
+      )}
+
       {/* Đề */}
       <div className="relative mb-4 rounded-3xl border border-line bg-card px-5 py-6 shadow-card">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-sub">Điền từ thích hợp</p>
-            <p className="mt-1 text-sm text-ink">
-              <span className="font-semibold">{card.meaning}</span>
-              <span className="ml-2 font-jp text-sub/70">({card.word} · {card.reading})</span>
-            </p>
-          </div>
-          <button
-            onClick={skip}
-            disabled={loading || state !== "idle"}
-            title="Đổi câu khác"
-            className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-sub transition hover:border-indigo hover:text-indigo disabled:opacity-30"
-          >
-            🔄 Câu khác
-          </button>
-        </div>
+        <p className="text-xs font-semibold uppercase tracking-widest text-sub">Điền từ có nghĩa</p>
+        <p className="mt-1 mb-4 text-lg font-semibold text-ink">
+          &ldquo;{card.meaning}&rdquo;
+        </p>
 
-        {loading && (
-          <div className="flex items-center gap-2 py-4 text-sub">
+        {cardStillLoading && (
+          <div className="flex items-center gap-2 py-6 text-sub">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-indigo border-t-transparent" />
-            <span className="text-sm">Đang tạo câu mới...</span>
+            <span className="text-sm">Đang tạo câu...</span>
           </div>
         )}
-        {error && !loading && (
-          <div className="py-4 text-center text-sm text-shu">
-            {error}
-            <button onClick={() => card && generate(card)} className="ml-2 font-semibold text-indigo hover:underline">Thử lại</button>
-          </div>
+        {!cardStillLoading && currentSentence === null && (
+          <p className="py-6 text-center text-sm text-shu">
+            Không tạo được câu cho từ này. <button
+              onClick={next}
+              className="ml-2 font-semibold text-indigo hover:underline"
+            >Bỏ qua</button>
+          </p>
         )}
-        {!loading && sentence && (
+        {!cardStillLoading && currentSentence && (
           <>
             <div className="flex items-start gap-2">
               <button
-                onClick={() => speak(sentence.jp)}
+                onClick={() => speak(currentSentence.jp.replace(/\[[^\]]*\]/g, "").replace(/<<|>>/g, ""))}
                 aria-label="Phát âm"
-                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo text-white transition hover:bg-indigo-deep"
+                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo text-white transition hover:bg-indigo-deep"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -247,10 +316,12 @@ export default function FillMode({ cards, sessionKey }: { cards: Card[]; session
               </button>
               <div className="flex-1">{renderSentence()}</div>
             </div>
-            {sentence.vi && (
-              <p className="mt-3 border-l-2 border-line pl-3 text-sm italic text-sub">{sentence.vi}</p>
+            {currentSentence.vi && (
+              <p className="mt-3 border-l-2 border-line pl-3 text-sm italic text-sub">
+                {currentSentence.vi}
+              </p>
             )}
-            {source === "cache" && (
+            {currentSentence.fromCache && (
               <p className="mt-2 text-[10px] uppercase tracking-widest text-sub/50">Nguồn: Tatoeba (Gemini lỗi)</p>
             )}
           </>
@@ -267,9 +338,9 @@ export default function FillMode({ cards, sessionKey }: { cards: Card[]; session
           if (e.nativeEvent.isComposing) return;
           if (e.key === "Enter" && state === "idle") check();
         }}
-        disabled={state !== "idle" || loading || !sentence}
+        disabled={state !== "idle" || cardStillLoading || !currentSentence}
         key={i}
-        placeholder="Nhập từ điền vào chỗ trống (kanji hoặc kana)"
+        placeholder="Điền từ vào chỗ trống (kanji hoặc kana)"
         className={`w-full rounded-xl border-2 bg-card px-4 py-3.5 font-jp text-lg outline-none transition ${
           state === "right"
             ? "border-moss text-moss"
@@ -279,11 +350,11 @@ export default function FillMode({ cards, sessionKey }: { cards: Card[]; session
         }`}
       />
 
-      {state === "wrong" && sentence && (
+      {state === "wrong" && targetSeg && (
         <p className="mt-2 animate-slide-up text-sm">
-          Đáp án: <span className="font-jp font-semibold text-ink">{sentence.word}</span>
-          {sentence.word !== card.reading && (
-            <span className="ml-2 font-jp text-sub">({card.reading})</span>
+          Đáp án: <span className="font-jp font-semibold text-ink">{targetSeg.text}</span>
+          {targetSeg.reading && (
+            <span className="ml-2 font-jp text-sub">({targetSeg.reading})</span>
           )}
         </p>
       )}
@@ -291,7 +362,7 @@ export default function FillMode({ cards, sessionKey }: { cards: Card[]; session
       <div className="mt-3">
         <button
           onClick={state === "idle" ? check : next}
-          disabled={(state === "idle" && !value.trim()) || loading}
+          disabled={(state === "idle" && !value.trim()) || cardStillLoading || !currentSentence}
           className="w-full rounded-xl bg-indigo py-3 font-semibold text-white transition hover:bg-indigo-deep disabled:opacity-40"
         >
           {state === "idle" ? "Kiểm tra" : i + 1 === deck.length ? "Xem kết quả" : "Câu tiếp theo"}
@@ -299,7 +370,7 @@ export default function FillMode({ cards, sessionKey }: { cards: Card[]; session
       </div>
 
       <p className="mt-2 text-center text-xs text-sub/50">
-        Câu sinh mới mỗi lần bằng Gemini · Enter để kiểm tra/tiếp theo
+        Câu sinh mới mỗi lần bằng Gemini · Enter để kiểm tra / tiếp theo
       </p>
     </div>
   );
