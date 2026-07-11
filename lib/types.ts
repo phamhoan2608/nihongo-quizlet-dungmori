@@ -37,4 +37,4 @@ export interface CardProgress {
   lastSeen: number;
 }
 
-export type Mode = "flashcard" | "quiz" | "match" | "typing" | "listen" | "spell" | "test" | "writing";
+export type Mode = "flashcard" | "quiz" | "match" | "typing" | "listen" | "spell" | "fill" | "test" | "writing";

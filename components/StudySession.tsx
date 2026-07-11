@@ -17,6 +17,7 @@ import MatchMode from "./MatchMode";
 import TypingMode from "./TypingMode";
 import ListenMode from "./ListenMode";
 import SpellMode from "./SpellMode";
+import FillMode from "./FillMode";
 import TestMode from "./TestMode";
 import WritingMode from "./WritingMode";
 
@@ -107,6 +108,22 @@ const MODES: ModeInfo[] = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
         <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
         <path d="m15 5 4 4" />
+      </svg>
+    ),
+  },
+  {
+    id: "fill",
+    label: "Điền từ",
+    desc: "AI sinh câu mới, điền từ vào chỗ trống",
+    iconBg: "bg-indigo-soft text-indigo",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <path d="M4 6h6" />
+        <path d="M4 12h4" />
+        <path d="M4 18h10" />
+        <rect x="14" y="4" width="6" height="6" rx="1" fill="currentColor" opacity="0.15" />
+        <path d="M14 4h6v6h-6z" />
+        <path d="M16 7h2" />
       </svg>
     ),
   },
@@ -434,6 +451,7 @@ export default function StudySession({
             {mode === "typing"    && <TypingMode     cards={filtered} autoPlay={autoPlay} sessionKey={sessionKey} />}
             {mode === "listen"    && <ListenMode     cards={filtered} sessionKey={sessionKey} />}
             {mode === "spell"     && <SpellMode      cards={filtered} />}
+            {mode === "fill"      && <FillMode       cards={filtered} sessionKey={sessionKey} />}
             {mode === "test"      && <TestMode       cards={filtered} />}
             {mode === "writing"   && <WritingMode    cards={filtered} />}
           </div>
