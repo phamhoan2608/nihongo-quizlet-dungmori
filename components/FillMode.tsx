@@ -283,10 +283,7 @@ export default function FillMode({ cards }: { cards: Card[]; sessionKey?: string
 
       {/* Đề */}
       <div className="relative mb-4 rounded-3xl border border-line bg-card px-5 py-6 shadow-card">
-        <p className="text-xs font-semibold uppercase tracking-widest text-sub">Điền từ có nghĩa</p>
-        <p className="mt-1 mb-4 text-lg font-semibold text-ink">
-          &ldquo;{card.meaning}&rdquo;
-        </p>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-sub">Điền từ vào chỗ trống</p>
 
         {cardStillLoading && (
           <div className="flex items-center gap-2 py-6 text-sub">
@@ -303,28 +300,18 @@ export default function FillMode({ cards }: { cards: Card[]; sessionKey?: string
           </p>
         )}
         {!cardStillLoading && currentSentence && (
-          <>
-            <div className="flex items-start gap-2">
-              <button
-                onClick={() => speak(currentSentence.jp.replace(/\[[^\]]*\]/g, "").replace(/<<|>>/g, ""))}
-                aria-label="Phát âm"
-                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo text-white transition hover:bg-indigo-deep"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                </svg>
-              </button>
-              <div className="flex-1">{renderSentence()}</div>
-            </div>
-            {currentSentence.vi && (
-              <p className="mt-3 border-l-2 border-line pl-3 text-sm italic text-sub">
-                {currentSentence.vi}
-              </p>
-            )}
-            {currentSentence.fromCache && (
-              <p className="mt-2 text-[10px] uppercase tracking-widest text-sub/50">Nguồn: Tatoeba (Gemini lỗi)</p>
-            )}
-          </>
+          <div className="flex items-start gap-2">
+            <button
+              onClick={() => speak(currentSentence.jp.replace(/\[[^\]]*\]/g, "").replace(/<<|>>/g, ""))}
+              aria-label="Phát âm"
+              className="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo text-white transition hover:bg-indigo-deep"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              </svg>
+            </button>
+            <div className="flex-1">{renderSentence()}</div>
+          </div>
         )}
         {state === "right" && <span className="absolute -right-2 -top-2"><Seal /></span>}
       </div>
