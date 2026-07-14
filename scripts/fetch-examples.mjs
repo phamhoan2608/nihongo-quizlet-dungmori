@@ -1,41 +1,50 @@
 /**
- * Auto-fetch example sentences (Tatoeba) for each vocab card.
- * Saves to data/examples.json (id → [{jp, en, vi?}]).
- * Also translates EN → VI via MyMemory (free, no key).
+ * Sinh câu ví dụ N5 (đơn giản, có furigana + dịch VI) cho mỗi thẻ, dùng Gemini.
+ * Lưu vào data/examples.json (id → [{jp, vi}]).
  *
  * Usage:
- *   node scripts/fetch-examples.mjs [--reset] [--max=N]
+ *   node scripts/fetch-examples.mjs [--reset] [--max=N] [--only-missing]
  *
- * --reset : clear existing examples.json and re-fetch everything
- * --max=N : only process first N pending cards (for testing)
+ * --reset        : xoá examples.json cũ và fetch lại toàn bộ
+ * --max=N        : chỉ xử lý N thẻ đầu tiên (để test)
+ * --only-missing : chỉ fetch các thẻ chưa có, hoặc thẻ có jp cũ không có furigana
  */
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
+// ── Args ──────────────────────────────────────────────────────────────────
 const reset = process.argv.includes("--reset");
-const viRefill = process.argv.includes("--vi-refill");
+const onlyMissing = process.argv.includes("--only-missing");
 const maxArg = process.argv.find((a) => a.startsWith("--max="));
 const MAX = maxArg ? parseInt(maxArg.slice(6), 10) : Infinity;
 
-// ── HTTP ──────────────────────────────────────────────────────────────────
-function curlGet(url) {
-  try {
-    const out = execSync(`curl -s --max-time 15 "${url.replace(/"/g, '\\"')}"`, { encoding: "utf-8" });
-    return JSON.parse(out);
-  } catch {
-    return null;
+// ── Load .env.local (Node không auto-load) ────────────────────────────────
+function loadEnv() {
+  const envPath = path.join(ROOT, ".env.local");
+  if (!fs.existsSync(envPath)) return;
+  for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
+    const m = line.match(/^([A-Z_]+)=(.*)$/);
+    if (m) process.env[m[1]] = m[2].trim();
   }
 }
+loadEnv();
 
-function sleep(seconds) {
-  execSync(`sleep ${seconds}`);
+if (!process.env.GEMINI_API_KEY) {
+  console.error("Thiếu GEMINI_API_KEY trong .env.local");
+  process.exit(1);
 }
+
+const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genai.getGenerativeModel({
+  model: "gemini-2.5-flash",
+  generationConfig: { temperature: 1.1, topP: 0.95 },
+});
 
 // ── Data ──────────────────────────────────────────────────────────────────
 const n5 = JSON.parse(fs.readFileSync(path.join(ROOT, "data/n5.json"), "utf-8"));
@@ -45,118 +54,103 @@ const existing = !reset && fs.existsSync(examplesPath)
   ? JSON.parse(fs.readFileSync(examplesPath, "utf-8"))
   : {};
 
-if (reset) console.log("--reset: clearing existing examples.\n");
+if (reset) console.log("--reset: xoá dữ liệu cũ.\n");
 
-// ── Clean the search query for Tatoeba ────────────────────────────────────
-function cleanWord(w) {
-  return w
-    .replace(/[～~]/g, "")
-    .replace(/[（(][^）)]*[）)]/g, "")
-    .replace(/する$/, "")
-    .replace(/[、。！？]/g, "")
-    .trim();
+// ── Helpers ───────────────────────────────────────────────────────────────
+function hasBareKanji(jp) {
+  const stripped = jp
+    .replace(/<<|>>/g, "")
+    .replace(/[一-龯々ヶ]+\[[ぁ-んァ-ヶー]+\]/g, "");
+  return /[一-龯々ヶ]/.test(stripped);
 }
 
-// ── Fetch from Tatoeba ────────────────────────────────────────────────────
-function fetchTatoeba(word) {
-  const q = cleanWord(word);
-  if (!q) return [];
-  const url = `https://tatoeba.org/en/api_v0/search?query=${encodeURIComponent(q)}&from=jpn&to=eng&sort=relevance`;
-  const data = curlGet(url);
-  const results = (data?.results ?? []).slice(0, 3);
-  return results
-    .map((r) => {
-      const allTranslations = (r.translations ?? []).flat();
-      const en = allTranslations.find((t) => t.lang === "eng")?.text;
-      return { jp: r.text, en };
-    })
-    .filter((e) => e.jp && e.en)
-    .slice(0, 2);
+function hasFurigana(entries) {
+  return Array.isArray(entries)
+    && entries.length > 0
+    && entries.every((e) => e.jp && e.vi && !hasBareKanji(e.jp));
 }
 
-// ── Translate EN → VI via MyMemory ────────────────────────────────────────
-let mymemoryExhausted = false;
+function buildPrompt(word, reading, meaning) {
+  return `Bạn là giáo viên tiếng Nhật N5. Tạo 1-2 câu ví dụ đơn giản trình độ N5 dùng từ "${word}" (${reading}: ${meaning}).
 
-function translateEnToVi(text) {
-  if (!text || mymemoryExhausted) return null;
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|vi`;
-  const data = curlGet(url);
-  const result = data?.responseData?.translatedText;
-  if (!result) return null;
-  // Detect quota-exhausted response
-  if (result.includes("MYMEMORY WARNING")) {
-    mymemoryExhausted = true;
-    console.log("\n⚠ MyMemory quota exhausted. Skipping VI translation for remaining cards.");
-    return null;
+Yêu cầu:
+- Ngữ pháp N5 (dạng masu, です/ます), 10-25 ký tự mỗi câu
+- HẠN CHẾ kanji khó, chỉ dùng kanji + từ vựng N5
+- Từ "${word}" xuất hiện tự nhiên trong câu
+- Kết thúc bằng 。
+
+FURIGANA BẮT BUỘC:
+- MỌI kanji trong câu (KHÔNG NGOẠI LỆ) có furigana ngay sau: 漢字[かんじ]
+- Cụm kanji liền nhau gộp: 毎日[まいにち] (KHÔNG tách 毎[まい]日[にち])
+- Kana và dấu câu giữ nguyên
+
+Ví dụ ĐÚNG: 私[わたし]は毎日[まいにち]本[ほん]を読[よ]みます。
+Ví dụ SAI (thiếu furigana): 私は本[ほん]を読[よ]みます。
+
+Trả về JSON thuần (không markdown, không giải thích):
+{"examples":[{"jp":"câu 1 có furigana","vi":"dịch tiếng Việt"},{"jp":"câu 2","vi":"dịch"}]}`;
+}
+
+async function generateFor(card) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await model.generateContent(buildPrompt(card.word, card.reading, card.meaning));
+      const raw = res.response.text();
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) continue;
+      const parsed = JSON.parse(m[0]);
+      const valid = (parsed.examples ?? [])
+        .filter((e) => e.jp && e.vi && !hasBareKanji(e.jp))
+        .slice(0, 2);
+      if (valid.length > 0) return valid;
+    } catch { /* thử lại */ }
   }
-  if (result.toLowerCase() === text.toLowerCase()) return null;
-  return result;
+  return null;
 }
+
+async function sleepMs(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 // ── Main ──────────────────────────────────────────────────────────────────
 const result = { ...existing };
 
-// Mode 1: --vi-refill — chỉ dịch bổ sung VI cho entry đã có (không fetch lại Tatoeba)
-if (viRefill) {
-  console.log("VI-refill mode: only translating existing entries missing 'vi'.\n");
-  let filled = 0, quotaHit = false;
-  for (const id of Object.keys(result)) {
-    if (quotaHit) break;
-    for (const ex of result[id]) {
-      if (ex.vi || !ex.en) continue;
-      const vi = translateEnToVi(ex.en);
-      sleep(0.4);
-      if (mymemoryExhausted) { quotaHit = true; break; }
-      if (vi) { ex.vi = vi; filled++; }
+const todo = n5.filter((c) => {
+  if (onlyMissing) return !hasFurigana(result[String(c.id)]);
+  return !result[String(c.id)] || !hasFurigana(result[String(c.id)]);
+}).slice(0, MAX);
+
+console.log(`${n5.length} thẻ, cần sinh ${todo.length} thẻ.\n`);
+
+let done = 0, failed = 0;
+const CONCURRENCY = 3;   // gemini free tier ~10 RPM, để CONCURRENCY thấp
+const RATE_LIMIT_MS = 250; // delay giữa các request
+
+let cursor = 0;
+async function worker(id) {
+  while (cursor < todo.length) {
+    const idx = cursor++;
+    const card = todo[idx];
+    await sleepMs(RATE_LIMIT_MS * id); // stagger workers
+    process.stdout.write(`[${card.id}] ${card.word} … `);
+    const exs = await generateFor(card);
+    if (exs) {
+      result[String(card.id)] = exs;
+      done++;
+      console.log(`✓ ${exs.length} câu`);
+    } else {
+      failed++;
+      console.log("— thất bại");
     }
-    if (filled % 20 === 0 && filled > 0) {
+    // Save periodically
+    if ((done + failed) % 10 === 0) {
       fs.writeFileSync(examplesPath, JSON.stringify(result, null, 2) + "\n");
     }
   }
-  fs.writeFileSync(examplesPath, JSON.stringify(result, null, 2) + "\n");
-  console.log(`\nDone. ✓ ${filled} câu đã dịch bổ sung VI.`);
-  process.exit(0);
 }
 
-// Mode 2: default — fetch Tatoeba + translate cho các từ chưa có entry
-const todo = n5.filter((c) => !result[String(c.id)]).slice(0, MAX);
-
-console.log(`${n5.length} cards total, ${todo.length} need examples.\n`);
-
-let done = 0, skipped = 0;
-
-for (const card of todo) {
-  const jp = cleanWord(card.word);
-  process.stdout.write(`[${card.id}] ${jp} … `);
-
-  const examples = fetchTatoeba(card.word);
-  sleep(1.0); // Tatoeba rate limit
-
-  if (examples.length === 0) {
-    skipped++;
-    console.log("— no sentences");
-    continue;
-  }
-
-  // Translate first sentence's EN to VI
-  for (const ex of examples) {
-    if (ex.en) {
-      const vi = translateEnToVi(ex.en);
-      if (vi) ex.vi = vi;
-      sleep(0.4);
-    }
-  }
-
-  result[String(card.id)] = examples;
-  done++;
-  console.log(`✓ ${examples.length} câu`);
-
-  // Save incrementally every 10 cards
-  if (done % 10 === 0) {
-    fs.writeFileSync(examplesPath, JSON.stringify(result, null, 2) + "\n");
-  }
-}
+await Promise.all(
+  Array(Math.min(CONCURRENCY, todo.length)).fill(0).map((_, i) => worker(i))
+);
 
 fs.writeFileSync(examplesPath, JSON.stringify(result, null, 2) + "\n");
-console.log(`\nDone. ✓ ${done} có ví dụ  — ${skipped} không có`);
-console.log(`Saved to data/examples.json (${Object.keys(result).length} total).`);
+console.log(`\nDone. ✓ ${done} thành công — ${failed} thất bại`);
+console.log(`Tổng examples.json: ${Object.keys(result).length} thẻ.`);

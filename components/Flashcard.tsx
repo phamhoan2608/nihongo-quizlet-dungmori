@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { Card, Example } from "@/lib/types";
 import type { MemoryLevelInfo } from "@/lib/storage";
 import { kanaToRomaji } from "@/lib/romaji";
+import { parseFurigana, stripFurigana } from "@/lib/furigana";
 import Speaker from "./Speaker";
 
 export default function Flashcard({
@@ -42,7 +43,15 @@ export default function Flashcard({
     if (!examples || examples.length === 0) {
       setLoading(true);
       try {
-        const res = await fetch(`/api/example?word=${encodeURIComponent(card.word)}`);
+        const res = await fetch("/api/example", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            word: card.word,
+            reading: card.reading,
+            meaning: card.meaning,
+          }),
+        });
         const data = await res.json();
         setExamples(data.examples ?? []);
       } catch {
@@ -154,21 +163,33 @@ export default function Flashcard({
                 <p className="text-center text-sm text-sub">Chưa có ví dụ cho từ này.</p>
               )}
               {!loading && examples && examples.length > 0 && (
-                <ul className="space-y-3">
-                  {examples.map((ex, idx) => (
-                    <li key={idx} className="flex flex-col gap-1">
-                      <div className="flex items-start gap-2">
-                        <Speaker text={ex.jp} />
-                        <p className="font-jp text-base leading-relaxed text-ink">{ex.jp}</p>
-                      </div>
-                      {ex.vi && (
-                        <p className="pl-8 text-sm text-sub">{ex.vi}</p>
-                      )}
-                      {!ex.vi && ex.en && (
-                        <p className="pl-8 text-sm italic text-sub/80">{ex.en}</p>
-                      )}
-                    </li>
-                  ))}
+                <ul className="space-y-4">
+                  {examples.map((ex, idx) => {
+                    const segs = parseFurigana(ex.jp);
+                    const plain = stripFurigana(ex.jp);
+                    return (
+                      <li key={idx} className="flex flex-col gap-1">
+                        <div className="flex items-start gap-2">
+                          <Speaker text={plain} />
+                          <p className="font-jp text-base leading-[2.4rem] text-ink">
+                            {segs.map((seg, si) =>
+                              seg.reading ? (
+                                <ruby key={si}>
+                                  {seg.text}
+                                  <rt className="text-[0.55em] font-normal text-sub">{seg.reading}</rt>
+                                </ruby>
+                              ) : (
+                                <span key={si}>{seg.text}</span>
+                              )
+                            )}
+                          </p>
+                        </div>
+                        {ex.vi && (
+                          <p className="pl-8 text-sm text-sub">{ex.vi}</p>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
