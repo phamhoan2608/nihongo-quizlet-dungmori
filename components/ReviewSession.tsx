@@ -257,9 +257,9 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
           </div>
         ) : (
           <div key={mode}>
-            {mode === "quiz"   && <QuizMode   cards={dueCards} autoPlay={autoPlay} />}
-            {mode === "typing" && <TypingMode cards={dueCards} autoPlay={autoPlay} />}
-            {mode === "listen" && <ListenMode cards={dueCards} />}
+            {mode === "quiz"   && <QuizMode   cards={dueCards} autoPlay={autoPlay} sessionKey={SESSION_KEY} />}
+            {mode === "typing" && <TypingMode cards={dueCards} autoPlay={autoPlay} sessionKey={SESSION_KEY} />}
+            {mode === "listen" && <ListenMode cards={dueCards} sessionKey={SESSION_KEY} />}
             {mode === "spell"  && <SpellMode  cards={dueCards} />}
           </div>
         )}

@@ -86,6 +86,7 @@ Trả về JSON thuần (không markdown):
     if (!result) {
       return NextResponse.json({ error: "no valid sentence after retries" }, { status: 422 });
     }
+    return NextResponse.json(result);
   } catch (err) {
     console.error("[fill-generate]", err);
     return NextResponse.json({ error: "Không tạo được câu. Thử lại sau." }, { status: 500 });

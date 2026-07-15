@@ -250,6 +250,7 @@ export default function TestMode({ cards }: { cards: Card[] }) {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
               if (e.key === "Enter") typingState === "idle" ? checkTyping() : next();
             }}
             disabled={typingState !== "idle"}
