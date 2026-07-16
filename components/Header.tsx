@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import SearchPopup from "./SearchPopup";
+import AuthButton from "./AuthButton";
 
 const NAV = [
   { href: "/review", label: "Ôn tập" },
@@ -20,21 +20,24 @@ export default function Header() {
           <span className="rounded-md bg-shu-soft px-2 py-0.5 text-xs font-bold text-shu">N5</span>
         </Link>
 
-        <nav className="flex items-center gap-1">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${
-                pathname.startsWith(n.href)
-                  ? "bg-indigo-soft text-indigo"
-                  : "text-sub hover:bg-indigo-soft hover:text-indigo"
-              }`}
-            >
-              {n.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="flex items-center gap-2">
+          <nav className="flex items-center gap-1">
+            {NAV.map((n) => (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${
+                  pathname.startsWith(n.href)
+                    ? "bg-indigo-soft text-indigo"
+                    : "text-sub hover:bg-indigo-soft hover:text-indigo"
+                }`}
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+          <AuthButton />
+        </div>
       </div>
     </header>
   );

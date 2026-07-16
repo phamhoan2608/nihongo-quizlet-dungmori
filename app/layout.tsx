@@ -3,6 +3,8 @@ import "./globals.css";
 import ThemeToggle from "@/components/ThemeToggle";
 import Header from "@/components/Header";
 import SearchPopup from "@/components/SearchPopup";
+import SyncManager from "@/components/SyncManager";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "Minna Flashcards",
@@ -32,10 +34,13 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen font-sans antialiased">
-        <Header />
-        <div className="pt-14">{children}</div>
-        <SearchPopup />
-        <ThemeToggle />
+        <Providers>
+          <SyncManager />
+          <Header />
+          <div className="pt-14">{children}</div>
+          <SearchPopup />
+          <ThemeToggle />
+        </Providers>
       </body>
     </html>
   );

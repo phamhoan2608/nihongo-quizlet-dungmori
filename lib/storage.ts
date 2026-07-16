@@ -18,6 +18,13 @@ function read(): Store {
 function write(s: Store): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(KEY, JSON.stringify(s));
+  notifyChange();
+}
+
+/** Bắn event để SyncManager pick up và schedule upload lên KV. */
+function notifyChange(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("minna-local-updated"));
 }
 
 const DAY = 86_400_000;
@@ -270,6 +277,7 @@ export function recordStudyToday(): void {
   const yStr = yesterday.toISOString().slice(0, 10);
   const newStreak = data.lastDate === yStr ? data.streak + 1 : 1;
   localStorage.setItem(STREAK_KEY, JSON.stringify({ streak: newStreak, lastDate: today }));
+  notifyChange();
 }
 
 /** Increment the count of cards studied today. */
@@ -280,6 +288,7 @@ export function incrementDailyCount(): void {
     const today = todayStr();
     daily[today] = (daily[today] ?? 0) + 1;
     localStorage.setItem(DAILY_KEY, JSON.stringify(daily));
+    notifyChange();
   } catch {}
 }
 
@@ -320,6 +329,7 @@ export interface LastStudied {
 export function saveLastStudied(info: LastStudied): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(LAST_STUDIED_KEY, JSON.stringify(info));
+  notifyChange();
 }
 
 export function loadLastStudied(): LastStudied | null {
@@ -342,6 +352,7 @@ export function getOnlyVocab(): boolean {
 export function setOnlyVocabPref(v: boolean): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(ONLY_VOCAB_KEY, String(v));
+  notifyChange();
 }
 
 // ── Auto-play setting ─────────────────────────────────────────────────────
@@ -357,6 +368,7 @@ export function getAutoPlay(): boolean {
 export function setAutoPlay(v: boolean): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(AUTOPLAY_KEY, String(v));
+  notifyChange();
 }
 
 // ── Important words ────────────────────────────────────────────────────────
@@ -373,6 +385,7 @@ function readImportant(): Set<number> {
 function writeImportant(s: Set<number>): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(IMPORTANT_KEY, JSON.stringify([...s]));
+  notifyChange();
 }
 
 export function isImportant(id: number): boolean {
