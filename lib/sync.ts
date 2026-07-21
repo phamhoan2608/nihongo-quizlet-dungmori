@@ -147,6 +147,20 @@ export function scheduleUpload(delayMs = 2000): void {
   }, delayMs);
 }
 
+/**
+ * Reload trang 1 lần sau khi apply remote để React components mount lại
+ * với localStorage đã cập nhật (do useState initializer chỉ chạy 1 lần).
+ * Dùng sessionStorage flag để tránh infinite loop.
+ */
+function reloadOnceAfterSync(): void {
+  if (typeof window === "undefined") return;
+  const RELOAD_FLAG = "minna-post-login-reloaded";
+  if (sessionStorage.getItem(RELOAD_FLAG) === "1") return;
+  sessionStorage.setItem(RELOAD_FLAG, "1");
+  // Nhẹ delay để status "done" kịp emit
+  setTimeout(() => window.location.reload(), 150);
+}
+
 /** Gọi khi user login lần đầu: pull remote + merge với local + push lại. */
 export async function initialSync(): Promise<{ merged: boolean; error?: string }> {
   emit("syncing");
@@ -162,7 +176,7 @@ export async function initialSync(): Promise<{ merged: boolean; error?: string }
       return { merged: false };
     }
     if (!hasRemote) {
-      // Upload local lên
+      // Upload local lên (local là source of truth, không cần reload)
       local.updatedAt = Date.now();
       const r = await pushRemote(local);
       if (r.quotaExceeded) { emit("quota"); return { merged: false, error: "quota" }; }
@@ -171,18 +185,20 @@ export async function initialSync(): Promise<{ merged: boolean; error?: string }
       return { merged: false };
     }
     if (!hasLocal) {
-      // Chỉ pull xuống
+      // Chỉ pull xuống → cần reload để UI cập nhật
       applyRemote(remote!);
       emit("done");
+      reloadOnceAfterSync();
       return { merged: false };
     }
-    // Cả 2 đều có data → merge
+    // Cả 2 đều có data → merge → cần reload để UI cập nhật (local đã đổi)
     const merged = mergePayloads(local, remote!);
     merged.updatedAt = Date.now();
     applyRemote(merged);
     const r = await pushRemote(merged);
     if (r.quotaExceeded) { emit("quota"); return { merged: true, error: "quota" }; }
     emit("done");
+    reloadOnceAfterSync();
     return { merged: true };
   } catch (e) {
     emit("error");

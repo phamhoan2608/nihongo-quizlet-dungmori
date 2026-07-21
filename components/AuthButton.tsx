@@ -97,7 +97,11 @@ export default function AuthButton() {
               </p>
             </div>
             <button
-              onClick={() => { setMenuOpen(false); signOut(); }}
+              onClick={() => {
+                setMenuOpen(false);
+                sessionStorage.removeItem("minna-post-login-reloaded");
+                signOut();
+              }}
               className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-ink transition hover:bg-shu-soft hover:text-shu"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
