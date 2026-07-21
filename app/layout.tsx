@@ -7,9 +7,9 @@ import SyncManager from "@/components/SyncManager";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
-  title: "Minna Flashcards",
+  title: "あ Minna Flashcards · Nhật N5",
   description:
-    "Học từ vựng Minna no Nihongo bằng flashcard, trắc nghiệm, nối cặp và gõ đáp án.",
+    "Học từ vựng Minna no Nihongo N5 bằng flashcard, trắc nghiệm, nối cặp, điền từ và luyện viết.",
 };
 
 export default function RootLayout({
