@@ -446,10 +446,10 @@ export default function StudySession({
         ) : (
           <div key={deckKey}>
             {mode === "flashcard" && <FlashcardMode cards={filtered} autoPlay={autoPlay} sessionKey={sessionKey} />}
-            {mode === "quiz"      && <QuizMode      cards={filtered} autoPlay={autoPlay} sessionKey={sessionKey} />}
+            {mode === "quiz"      && <QuizMode      cards={filtered} autoPlay={autoPlay} sessionKey={sessionKey} distractorPool={cards} />}
             {mode === "match"     && <MatchMode      cards={filtered} />}
             {mode === "typing"    && <TypingMode     cards={filtered} autoPlay={autoPlay} sessionKey={sessionKey} />}
-            {mode === "listen"    && <ListenMode     cards={filtered} sessionKey={sessionKey} />}
+            {mode === "listen"    && <ListenMode     cards={filtered} sessionKey={sessionKey} distractorPool={cards} />}
             {mode === "spell"     && <SpellMode      cards={filtered} />}
             {mode === "fill"      && <FillMode       cards={filtered} sessionKey={sessionKey} />}
             {mode === "test"      && <TestMode       cards={filtered} />}

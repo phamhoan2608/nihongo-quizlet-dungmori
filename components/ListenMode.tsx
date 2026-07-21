@@ -12,8 +12,8 @@ interface Q {
   options: string[];
 }
 
-function buildQuestions(cards: Card[]): Q[] {
-  const pool = cards;
+function buildQuestions(cards: Card[], distractorPool: Card[]): Q[] {
+  const pool = distractorPool.length >= cards.length ? distractorPool : cards;
   return prioritizeCards(cards).map((card) => {
     const distractors = sample(
       pool.filter((c) => c.id !== card.id && c.meaning !== card.meaning),
@@ -23,21 +23,25 @@ function buildQuestions(cards: Card[]): Q[] {
   });
 }
 
-export default function ListenMode({ cards, sessionKey }: { cards: Card[]; sessionKey?: string }) {
+export default function ListenMode({
+  cards, sessionKey, distractorPool,
+}: {
+  cards: Card[]; sessionKey?: string; distractorPool?: Card[];
+}) {
   const [qs, setQs] = useState<Q[]>([]);
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [score, setScore] = useState(0);
 
   useEffect(() => {
-    const newQs = buildQuestions(cards);
+    const newQs = buildQuestions(cards, distractorPool ?? cards);
     const savedId = sessionKey ? loadSessionCardId(sessionKey, "listen") : null;
     const initialI = savedId != null ? Math.max(0, newQs.findIndex((q) => q.card.id === savedId)) : 0;
     setQs(newQs);
     setI(initialI);
     setPicked(null);
     setScore(0);
-  }, [cards]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cards, distractorPool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (sessionKey && qs[i]) saveSessionCardId(sessionKey, "listen", qs[i].card.id);
@@ -67,7 +71,7 @@ export default function ListenMode({ cards, sessionKey }: { cards: Card[]; sessi
   }, []);
 
   const restart = () => {
-    setQs(buildQuestions(cards));
+    setQs(buildQuestions(cards, distractorPool ?? cards));
     setI(0);
     setPicked(null);
     setScore(0);

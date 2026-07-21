@@ -13,36 +13,40 @@ interface Q {
   options: string[];
 }
 
-function buildQuestions(cards: Card[]): Q[] {
-  const pool = cards;
+function buildQuestions(cards: Card[], distractorPool: Card[]): Q[] {
+  // Pool cho distractors: dùng distractorPool nếu lớn hơn, fallback về cards.
+  const pool = distractorPool.length >= cards.length ? distractorPool : cards;
   return prioritizeCards(cards).map((card) => {
     const others = pool.filter((c) => c.id !== card.id && c.meaning !== card.meaning);
     const samePOS = others.filter((c) => c.pos === card.pos);
     const diffPOS = others.filter((c) => c.pos !== card.pos);
-    // Fill 3 distractor slots: prefer same POS for more realistic wrong answers
     const needed = 3;
     const fromSame = sample(samePOS, Math.min(needed, samePOS.length));
-    const fromDiff = sample(diffPOS, needed - fromSame.length);
+    const fromDiff = sample(diffPOS, Math.max(0, needed - fromSame.length));
     const distractors = [...fromSame, ...fromDiff].map((c) => c.meaning);
     return { card, options: shuffle([card.meaning, ...distractors]) };
   });
 }
 
-export default function QuizMode({ cards, autoPlay, sessionKey }: { cards: Card[]; autoPlay?: boolean; sessionKey?: string }) {
+export default function QuizMode({
+  cards, autoPlay, sessionKey, distractorPool,
+}: {
+  cards: Card[]; autoPlay?: boolean; sessionKey?: string; distractorPool?: Card[];
+}) {
   const [qs, setQs] = useState<Q[]>([]);
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [score, setScore] = useState(0);
 
   useEffect(() => {
-    const newQs = buildQuestions(cards);
+    const newQs = buildQuestions(cards, distractorPool ?? cards);
     const savedId = sessionKey ? loadSessionCardId(sessionKey, "quiz") : null;
     const initialI = savedId != null ? Math.max(0, newQs.findIndex((q) => q.card.id === savedId)) : 0;
     setQs(newQs);
     setI(initialI);
     setPicked(null);
     setScore(0);
-  }, [cards]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cards, distractorPool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (sessionKey && qs[i]) saveSessionCardId(sessionKey, "quiz", qs[i].card.id);
@@ -71,7 +75,7 @@ export default function QuizMode({ cards, autoPlay, sessionKey }: { cards: Card[
   }, []);
 
   const restart = () => {
-    setQs(buildQuestions(cards));
+    setQs(buildQuestions(cards, distractorPool ?? cards));
     setI(0);
     setPicked(null);
     setScore(0);
