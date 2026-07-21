@@ -85,35 +85,54 @@ export function mergePayloads(a: SyncPayload, b: SyncPayload): SyncPayload {
 }
 
 // ── API calls ────────────────────────────────────────────────────────────
-export async function pullRemote(): Promise<SyncPayload | null> {
+export type SyncResult = { ok: boolean; quotaExceeded?: boolean; message?: string };
+
+export async function pullRemote(): Promise<{ data: SyncPayload | null; quotaExceeded?: boolean }> {
   const res = await fetch("/api/sync", { cache: "no-store" });
-  if (!res.ok) return null;
+  if (res.status === 507) {
+    const j = await res.json().catch(() => ({}));
+    return { data: null, quotaExceeded: true };
+  }
+  if (!res.ok) return { data: null };
   const j = await res.json();
-  return (j.data as SyncPayload) ?? null;
+  return { data: (j.data as SyncPayload) ?? null };
 }
 
-export async function pushRemote(payload: SyncPayload): Promise<boolean> {
+export async function pushRemote(payload: SyncPayload): Promise<SyncResult> {
   const res = await fetch("/api/sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return res.ok;
+  if (res.status === 507) {
+    const j = await res.json().catch(() => ({}));
+    return { ok: false, quotaExceeded: true, message: j.message };
+  }
+  return { ok: res.ok };
 }
 
 // ── Debounced auto-upload sau mỗi thay đổi localStorage ──────────────────
 let uploadTimer: ReturnType<typeof setTimeout> | null = null;
 let uploadInFlight = false;
-type SyncStatus = "idle" | "syncing" | "error" | "done";
+export type SyncStatus = "idle" | "syncing" | "error" | "done" | "quota";
 let statusListeners: Array<(s: SyncStatus) => void> = [];
+let currentStatus: SyncStatus = "idle";
 
 export function onSyncStatus(cb: (s: SyncStatus) => void): () => void {
   statusListeners.push(cb);
+  cb(currentStatus); // gọi ngay để nhận trạng thái hiện tại
   return () => { statusListeners = statusListeners.filter((f) => f !== cb); };
 }
-function emit(s: SyncStatus) { statusListeners.forEach((f) => f(s)); }
+function emit(s: SyncStatus) {
+  currentStatus = s;
+  statusListeners.forEach((f) => f(s));
+}
+
+export function getSyncStatus(): SyncStatus { return currentStatus; }
 
 export function scheduleUpload(delayMs = 2000): void {
+  // Nếu đã quota exceeded, không thử upload nữa cho tới khi user reload trang
+  if (currentStatus === "quota") return;
   if (uploadTimer) clearTimeout(uploadTimer);
   uploadTimer = setTimeout(async () => {
     if (uploadInFlight) { scheduleUpload(500); return; }
@@ -122,8 +141,8 @@ export function scheduleUpload(delayMs = 2000): void {
     const payload = collectLocal();
     payload.updatedAt = Date.now();
     localStorage.setItem(K.lastSync, String(payload.updatedAt));
-    const ok = await pushRemote(payload);
-    emit(ok ? "done" : "error");
+    const result = await pushRemote(payload);
+    emit(result.quotaExceeded ? "quota" : result.ok ? "done" : "error");
     uploadInFlight = false;
   }, delayMs);
 }
@@ -132,7 +151,8 @@ export function scheduleUpload(delayMs = 2000): void {
 export async function initialSync(): Promise<{ merged: boolean; error?: string }> {
   emit("syncing");
   try {
-    const remote = await pullRemote();
+    const { data: remote, quotaExceeded } = await pullRemote();
+    if (quotaExceeded) { emit("quota"); return { merged: false, error: "quota" }; }
     const local = collectLocal();
     const hasLocal = Object.keys(local.progress).length > 0;
     const hasRemote = remote && Object.keys(remote.progress ?? {}).length > 0;
@@ -144,7 +164,8 @@ export async function initialSync(): Promise<{ merged: boolean; error?: string }
     if (!hasRemote) {
       // Upload local lên
       local.updatedAt = Date.now();
-      await pushRemote(local);
+      const r = await pushRemote(local);
+      if (r.quotaExceeded) { emit("quota"); return { merged: false, error: "quota" }; }
       localStorage.setItem(K.lastSync, String(local.updatedAt));
       emit("done");
       return { merged: false };
@@ -159,7 +180,8 @@ export async function initialSync(): Promise<{ merged: boolean; error?: string }
     const merged = mergePayloads(local, remote!);
     merged.updatedAt = Date.now();
     applyRemote(merged);
-    await pushRemote(merged);
+    const r = await pushRemote(merged);
+    if (r.quotaExceeded) { emit("quota"); return { merged: true, error: "quota" }; }
     emit("done");
     return { merged: true };
   } catch (e) {

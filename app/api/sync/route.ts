@@ -16,6 +16,22 @@ async function getUserEmail(): Promise<string | null> {
   return session?.user?.email ?? null;
 }
 
+/** Nhận diện lỗi vượt quota của Upstash (limit request/dung lượng). */
+function isQuotaError(err: unknown): boolean {
+  const msg = String((err as { message?: string })?.message ?? err ?? "").toLowerCase();
+  return /quota|limit exceed|too many|max daily|429|507|out of/i.test(msg);
+}
+
+function errorResponse(err: unknown, defaultMsg: string) {
+  if (isQuotaError(err)) {
+    return NextResponse.json(
+      { error: "quota_exceeded", message: "Đã hết dung lượng Upstash Redis free tier (500k requests / 256 MB tháng)." },
+      { status: 507 }
+    );
+  }
+  return NextResponse.json({ error: defaultMsg }, { status: 500 });
+}
+
 export async function GET() {
   const email = await getUserEmail();
   if (!email) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
@@ -25,7 +41,7 @@ export async function GET() {
     return NextResponse.json({ data: data ?? null });
   } catch (err) {
     console.error("[sync GET]", err);
-    return NextResponse.json({ error: "kv read failed" }, { status: 500 });
+    return errorResponse(err, "kv read failed");
   }
 }
 
@@ -43,6 +59,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, updatedAt: body.updatedAt });
   } catch (err) {
     console.error("[sync POST]", err);
-    return NextResponse.json({ error: "kv write failed" }, { status: 500 });
+    return errorResponse(err, "kv write failed");
   }
 }
