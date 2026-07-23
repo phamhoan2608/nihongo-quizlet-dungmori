@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import type { Card } from "@/lib/types";
 import { sample } from "@/lib/shuffle";
+import { recordStudyToday, incrementDailyCount } from "@/lib/storage";
 import type { WritingResult } from "@/app/api/writing-check/route";
 
 const TOPICS: Record<number, string> = {
@@ -79,6 +80,9 @@ export default function WritingMode({ cards }: { cards: Card[] }) {
       saveDailyCount(next);
       setUsageCount(next);
       setResult(data);
+      // Nộp bài luyện viết thành công cũng tính là hoạt động học hôm nay
+      incrementDailyCount();
+      recordStudyToday();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Lỗi không xác định");
     } finally {

@@ -138,6 +138,8 @@ export function grade(id: number, g: Grade, source: GradeSource = "exercise"): C
 
 /** User explicitly confirms they have mastered this word — sets box to 5. */
 export function markMastered(id: number): CardProgress {
+  incrementDailyCount();
+  recordStudyToday();
   const store = read();
   const p = store[id] ?? fresh();
   const now = Date.now();
@@ -248,8 +250,16 @@ export function getDueCards(cards: Card[]): Card[] {
 const STREAK_KEY = "minna-streak-v1";
 const DAILY_KEY  = "minna-daily-v1";
 
+/** YYYY-MM-DD theo LOCAL timezone (không phải UTC — quan trọng cho VN UTC+7). */
+function dateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return dateStr(new Date());
 }
 
 export interface StreakInfo {
@@ -266,7 +276,7 @@ export function getStreakInfo(): StreakInfo {
   }
 }
 
-/** Call once per day when the user studies at least one card. */
+/** Ghi nhận user học hôm nay (bất kỳ hoạt động nào: grade, mark mastered, viết bài...). */
 export function recordStudyToday(): void {
   if (typeof window === "undefined") return;
   const today = todayStr();
@@ -274,7 +284,7 @@ export function recordStudyToday(): void {
   if (data.lastDate === today) return;
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = yesterday.toISOString().slice(0, 10);
+  const yStr = dateStr(yesterday);
   const newStreak = data.lastDate === yStr ? data.streak + 1 : 1;
   localStorage.setItem(STREAK_KEY, JSON.stringify({ streak: newStreak, lastDate: today }));
   notifyChange();
@@ -301,7 +311,7 @@ export function getWeeklyActivity(): Array<{ date: string; count: number }> {
     for (let offset = 6; offset >= 0; offset--) {
       const d = new Date();
       d.setDate(d.getDate() - offset);
-      const date = d.toISOString().slice(0, 10);
+      const date = dateStr(d);
       result.push({ date, count: daily[date] ?? 0 });
     }
     return result;
