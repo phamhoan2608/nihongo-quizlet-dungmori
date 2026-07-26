@@ -278,19 +278,19 @@ function readRawStreak(): StreakInfo {
 }
 
 /**
- * Streak "hiệu quả": nếu lastDate là hôm nay hoặc hôm qua → giữ nguyên chuỗi.
- * Nếu bỏ ≥ 1 ngày (lastDate < hôm qua) → streak reset về 0 ngay (không cần
- * user mở app học lại mới thấy reset).
+ * Streak "hiệu quả": strict - chỉ sống nếu user ĐÃ học hôm nay.
+ * - lastDate = hôm nay → hiện streak
+ * - lastDate != hôm nay (kể cả hôm qua) → hiện 0
+ *
+ * Sáng dậy mở app chưa học → thấy 0 (nhắc nhở học ngay để giữ streak).
+ * Khi user học, recordStudyToday() sẽ +1 nếu hôm qua có học, hoặc reset về 1.
  */
 export function getStreakInfo(): StreakInfo {
   const raw = readRawStreak();
   if (!raw.lastDate) return { streak: 0, lastDate: "" };
   const today = todayStr();
   if (raw.lastDate === today) return raw;
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (raw.lastDate === dateStr(yesterday)) return raw; // chưa mất streak
-  return { streak: 0, lastDate: raw.lastDate }; // đã bỏ ≥ 1 ngày → mất chuỗi
+  return { streak: 0, lastDate: raw.lastDate };
 }
 
 /** Ghi nhận user học hôm nay (bất kỳ hoạt động nào: grade, mark mastered, viết bài...). */
