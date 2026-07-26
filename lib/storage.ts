@@ -267,13 +267,30 @@ export interface StreakInfo {
   lastDate: string;
 }
 
-export function getStreakInfo(): StreakInfo {
+/** Đọc dữ liệu streak thô đã lưu (không tính đến hôm nay). */
+function readRawStreak(): StreakInfo {
   if (typeof window === "undefined") return { streak: 0, lastDate: "" };
   try {
     return JSON.parse(localStorage.getItem(STREAK_KEY) || "{}") as StreakInfo;
   } catch {
     return { streak: 0, lastDate: "" };
   }
+}
+
+/**
+ * Streak "hiệu quả": nếu lastDate là hôm nay hoặc hôm qua → giữ nguyên chuỗi.
+ * Nếu bỏ ≥ 1 ngày (lastDate < hôm qua) → streak reset về 0 ngay (không cần
+ * user mở app học lại mới thấy reset).
+ */
+export function getStreakInfo(): StreakInfo {
+  const raw = readRawStreak();
+  if (!raw.lastDate) return { streak: 0, lastDate: "" };
+  const today = todayStr();
+  if (raw.lastDate === today) return raw;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (raw.lastDate === dateStr(yesterday)) return raw; // chưa mất streak
+  return { streak: 0, lastDate: raw.lastDate }; // đã bỏ ≥ 1 ngày → mất chuỗi
 }
 
 /** Ghi nhận user học hôm nay (bất kỳ hoạt động nào: grade, mark mastered, viết bài...). */
