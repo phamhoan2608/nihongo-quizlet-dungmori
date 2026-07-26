@@ -4,6 +4,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Header from "@/components/Header";
 import SearchPopup from "@/components/SearchPopup";
 import SyncManager from "@/components/SyncManager";
+import MilestoneToast from "@/components/MilestoneToast";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body className="min-h-screen font-sans antialiased">
         <Providers>
           <SyncManager />
+          <MilestoneToast />
           <Header />
           <div className="pt-14">{children}</div>
           <SearchPopup />

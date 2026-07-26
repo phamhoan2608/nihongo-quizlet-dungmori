@@ -13,6 +13,7 @@ const K = {
   lastStudied: "minna-last-studied-v1",
   autoPlay:    "minna-autoplay-v1",
   onlyVocab:   "minna-only-vocab-v1",
+  dailyGoal:   "minna-daily-goal-v1",
   lastSync:    "minna-last-sync",  // Timestamp của lần sync cuối
 };
 
@@ -26,21 +27,27 @@ export function collectLocal(): SyncPayload {
   if (typeof window === "undefined") return EMPTY_PAYLOAD;
   const progress = safeParse<Record<number, CardProgress>>(localStorage.getItem(K.progress), {});
   const important = safeParse<number[]>(localStorage.getItem(K.important), []);
-  const streak = safeParse<{streak: number; lastDate: string}>(
-    localStorage.getItem(K.streak), { streak: 0, lastDate: "" });
+  const streak = safeParse<SyncPayload["streak"]>(
+    localStorage.getItem(K.streak), EMPTY_PAYLOAD.streak);
   const daily = safeParse<Record<string, number>>(localStorage.getItem(K.daily), {});
   const lastStudied = safeParse<SyncPayload["lastStudied"]>(localStorage.getItem(K.lastStudied), null);
   const autoPlay = localStorage.getItem(K.autoPlay) === "true";
   const onlyVocab = localStorage.getItem(K.onlyVocab) === "true";
+  const dailyGoal = Number(localStorage.getItem(K.dailyGoal)) || EMPTY_PAYLOAD.prefs.dailyGoal;
   return {
     version: 1,
     updatedAt: Number(localStorage.getItem(K.lastSync)) || 0,
     progress,
     important,
-    streak,
+    streak: {
+      streak: streak.streak ?? 0,
+      lastDate: streak.lastDate ?? "",
+      freezes: streak.freezes ?? EMPTY_PAYLOAD.streak.freezes,
+      milestones: streak.milestones ?? [],
+    },
     daily,
     lastStudied,
-    prefs: { autoPlay, onlyVocab },
+    prefs: { autoPlay, onlyVocab, dailyGoal },
   };
 }
 
@@ -49,12 +56,13 @@ export function applyRemote(remote: SyncPayload): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(K.progress, JSON.stringify(remote.progress ?? {}));
   localStorage.setItem(K.important, JSON.stringify(remote.important ?? []));
-  localStorage.setItem(K.streak, JSON.stringify(remote.streak ?? { streak: 0, lastDate: "" }));
+  localStorage.setItem(K.streak, JSON.stringify(remote.streak ?? EMPTY_PAYLOAD.streak));
   localStorage.setItem(K.daily, JSON.stringify(remote.daily ?? {}));
   if (remote.lastStudied) localStorage.setItem(K.lastStudied, JSON.stringify(remote.lastStudied));
   else localStorage.removeItem(K.lastStudied);
   localStorage.setItem(K.autoPlay, String(remote.prefs?.autoPlay ?? false));
   localStorage.setItem(K.onlyVocab, String(remote.prefs?.onlyVocab ?? false));
+  localStorage.setItem(K.dailyGoal, String(remote.prefs?.dailyGoal ?? EMPTY_PAYLOAD.prefs.dailyGoal));
   localStorage.setItem(K.lastSync, String(remote.updatedAt));
   // Bắn event để các component đang mount re-read localStorage
   window.dispatchEvent(new Event("minna-sync-applied"));
@@ -74,7 +82,14 @@ export function mergePayloads(a: SyncPayload, b: SyncPayload): SyncPayload {
     daily[date] = Math.max(daily[date] ?? 0, count);
   }
   const important = Array.from(new Set([...(a.important ?? []), ...(b.important ?? [])]));
-  const streak = (a.streak.lastDate >= b.streak.lastDate) ? a.streak : b.streak;
+  // Streak: giữ lastDate mới hơn, freezes lấy min (tránh double-count khi merge), milestones union
+  const streakBase = (a.streak.lastDate >= b.streak.lastDate) ? a.streak : b.streak;
+  const streak: SyncPayload["streak"] = {
+    streak: streakBase.streak,
+    lastDate: streakBase.lastDate,
+    freezes: Math.min(a.streak.freezes ?? 2, b.streak.freezes ?? 2),
+    milestones: Array.from(new Set([...(a.streak.milestones ?? []), ...(b.streak.milestones ?? [])])),
+  };
   const lastStudied = (a.updatedAt >= b.updatedAt) ? a.lastStudied : b.lastStudied;
   const prefs = (a.updatedAt >= b.updatedAt) ? a.prefs : b.prefs;
   return {

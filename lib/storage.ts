@@ -263,47 +263,114 @@ function todayStr(): string {
 }
 
 export interface StreakInfo {
-  streak: number;
-  lastDate: string;
+  streak: number;         // Số ngày liên tiếp đạt goal
+  lastDate: string;       // YYYY-MM-DD ngày cuối đạt goal
+  freezes: number;        // Số streak freeze còn (0-MAX_FREEZES)
+  milestones: number[];   // Các mốc đã hiển thị animation (không hiện lại)
 }
 
-/** Đọc dữ liệu streak thô đã lưu (không tính đến hôm nay). */
+export const MAX_FREEZES = 2;
+export const MILESTONES = [3, 7, 14, 30, 100, 365, 1000] as const;
+
+/** Đọc dữ liệu streak thô đã lưu, migrate cho user cũ (chưa có freezes/milestones). */
 function readRawStreak(): StreakInfo {
-  if (typeof window === "undefined") return { streak: 0, lastDate: "" };
+  const fallback: StreakInfo = { streak: 0, lastDate: "", freezes: MAX_FREEZES, milestones: [] };
+  if (typeof window === "undefined") return fallback;
   try {
-    return JSON.parse(localStorage.getItem(STREAK_KEY) || "{}") as StreakInfo;
+    const parsed = JSON.parse(localStorage.getItem(STREAK_KEY) || "{}") as Partial<StreakInfo>;
+    return {
+      streak: parsed.streak ?? 0,
+      lastDate: parsed.lastDate ?? "",
+      freezes: parsed.freezes ?? MAX_FREEZES, // user cũ được tặng luôn 2 freeze
+      milestones: parsed.milestones ?? [],
+    };
   } catch {
-    return { streak: 0, lastDate: "" };
+    return fallback;
   }
 }
 
 /**
- * Streak "hiệu quả": strict - chỉ sống nếu user ĐÃ học hôm nay.
- * - lastDate = hôm nay → hiện streak
- * - lastDate != hôm nay (kể cả hôm qua) → hiện 0
- *
- * Sáng dậy mở app chưa học → thấy 0 (nhắc nhở học ngay để giữ streak).
- * Khi user học, recordStudyToday() sẽ +1 nếu hôm qua có học, hoặc reset về 1.
+ * Streak "hiệu quả": strict - chỉ hiện > 0 nếu đạt goal HÔM NAY.
+ * Freezes và milestones giữ nguyên để UI biết còn bao nhiêu freeze / mốc nào rồi.
  */
 export function getStreakInfo(): StreakInfo {
   const raw = readRawStreak();
-  if (!raw.lastDate) return { streak: 0, lastDate: "" };
+  if (!raw.lastDate) return raw;
   const today = todayStr();
   if (raw.lastDate === today) return raw;
-  return { streak: 0, lastDate: raw.lastDate };
+  return { ...raw, streak: 0 };
 }
 
-/** Ghi nhận user học hôm nay (bất kỳ hoạt động nào: grade, mark mastered, viết bài...). */
-export function recordStudyToday(): void {
-  if (typeof window === "undefined") return;
+/**
+ * Ghi nhận đạt goal hôm nay. Auto-consume freeze nếu bỏ ngày.
+ * Chỉ chạy khi getTodayCount() >= getDailyGoal() (kiểm tra bên trong).
+ * Trả về mốc mới đạt được (nếu có) để UI hiện animation.
+ */
+export function recordStudyToday(): { milestone: number | null } {
+  const result = { milestone: null as number | null };
+  if (typeof window === "undefined") return result;
   const today = todayStr();
-  const data = getStreakInfo();
-  if (data.lastDate === today) return;
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = dateStr(yesterday);
-  const newStreak = data.lastDate === yStr ? data.streak + 1 : 1;
-  localStorage.setItem(STREAK_KEY, JSON.stringify({ streak: newStreak, lastDate: today }));
+  const raw = readRawStreak();
+  if (raw.lastDate === today) return result; // đã record hôm nay
+
+  // Chưa đạt goal thì chưa tính streak
+  if (getTodayCount() < getDailyGoal()) return result;
+
+  // Tính streak mới, thử dùng freeze nếu bỏ ngày
+  let newStreak = 1;
+  let newFreezes = raw.freezes;
+  if (raw.lastDate) {
+    const lastMs = new Date(raw.lastDate + "T00:00:00").getTime();
+    const todayMs = new Date(today + "T00:00:00").getTime();
+    const daysSince = Math.round((todayMs - lastMs) / DAY);
+    if (daysSince === 1) {
+      newStreak = raw.streak + 1;
+    } else if (daysSince >= 2) {
+      const missed = daysSince - 1;
+      if (raw.freezes >= missed) {
+        newFreezes = raw.freezes - missed;
+        newStreak = raw.streak + 1; // freeze cứu chuỗi
+      }
+      // else: newStreak = 1 (chuỗi đứt, không đủ freeze)
+    }
+  }
+
+  // Tìm mốc mới đạt (chưa hiện animation)
+  const shown = new Set(raw.milestones);
+  const hit = MILESTONES.find((m) => newStreak >= m && !shown.has(m)) ?? null;
+  const newMilestones = hit ? [...raw.milestones, hit] : raw.milestones;
+
+  localStorage.setItem(STREAK_KEY, JSON.stringify({
+    streak: newStreak,
+    lastDate: today,
+    freezes: newFreezes,
+    milestones: newMilestones,
+  }));
+  notifyChange();
+
+  if (hit) {
+    window.dispatchEvent(new CustomEvent("minna-milestone", { detail: hit }));
+    result.milestone = hit;
+  }
+  return result;
+}
+
+// ── Daily goal ─────────────────────────────────────────────────────────────
+
+const GOAL_KEY = "minna-daily-goal-v1";
+export const DEFAULT_DAILY_GOAL = 5;
+export const GOAL_OPTIONS = [3, 5, 10, 20] as const;
+
+export function getDailyGoal(): number {
+  if (typeof window === "undefined") return DEFAULT_DAILY_GOAL;
+  const v = localStorage.getItem(GOAL_KEY);
+  const n = v ? Number(v) : DEFAULT_DAILY_GOAL;
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_DAILY_GOAL;
+}
+
+export function setDailyGoal(n: number): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(GOAL_KEY, String(n));
   notifyChange();
 }
 
