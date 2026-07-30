@@ -1,14 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Card, Mode } from "@/lib/types";
-import { getDueCards, getAutoPlay, setAutoPlay, saveSessionMode, loadSessionMode } from "@/lib/storage";
+import {
+  getDueCards, getAutoPlay, setAutoPlay, saveSessionMode, loadSessionMode,
+  REVIEW_BATCH_OPTIONS, REVIEW_BOX_FILTERS, boxDistribution, filterByBox,
+  getReviewBatchLimit, setReviewBatchLimit, getReviewBoxFilter, setReviewBoxFilter,
+  type ReviewBoxFilter,
+} from "@/lib/storage";
 
+import FlashcardMode from "./FlashcardMode";
 import QuizMode from "./QuizMode";
+import MatchMode from "./MatchMode";
 import TypingMode from "./TypingMode";
 import ListenMode from "./ListenMode";
 import SpellMode from "./SpellMode";
+import FillMode from "./FillMode";
 
 interface ModeInfo {
   id: Mode;
@@ -19,6 +27,18 @@ interface ModeInfo {
 }
 
 const REVIEW_MODES: ModeInfo[] = [
+  {
+    id: "flashcard",
+    label: "Lật thẻ",
+    desc: "Nhìn từ, lật xem nghĩa",
+    iconBg: "bg-indigo-soft text-indigo",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <rect x="2" y="5" width="15" height="11" rx="2" />
+        <rect x="7" y="9" width="15" height="11" rx="2" fill="currentColor" opacity="0.2" strokeWidth="1.5" />
+      </svg>
+    ),
+  },
   {
     id: "quiz",
     label: "Trắc nghiệm",
@@ -32,6 +52,21 @@ const REVIEW_MODES: ModeInfo[] = [
         <line x1="9" y1="13" x2="20" y2="13" />
         <circle cx="5" cy="19" r="1.5" fill="currentColor" stroke="none" />
         <line x1="9" y1="19" x2="20" y2="19" />
+      </svg>
+    ),
+  },
+  {
+    id: "match",
+    label: "Nối cặp",
+    desc: "Ghép từ Nhật với nghĩa Việt",
+    iconBg: "bg-moss/10 text-moss",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <circle cx="6" cy="8" r="3" fill="currentColor" opacity="0.15" />
+        <circle cx="6" cy="8" r="3" />
+        <circle cx="18" cy="16" r="3" fill="currentColor" opacity="0.15" />
+        <circle cx="18" cy="16" r="3" />
+        <line x1="9" y1="9.5" x2="15" y2="14.5" />
       </svg>
     ),
   },
@@ -73,6 +108,22 @@ const REVIEW_MODES: ModeInfo[] = [
       </svg>
     ),
   },
+  {
+    id: "fill",
+    label: "Điền từ",
+    desc: "AI sinh câu, điền chỗ trống",
+    iconBg: "bg-indigo-soft text-indigo",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+        <path d="M4 6h6" />
+        <path d="M4 12h4" />
+        <path d="M4 18h10" />
+        <rect x="14" y="4" width="6" height="6" rx="1" fill="currentColor" opacity="0.15" />
+        <path d="M14 4h6v6h-6z" />
+        <path d="M16 7h2" />
+      </svg>
+    ),
+  },
 ];
 
 const SESSION_KEY = "review";
@@ -82,10 +133,14 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
   const [autoPlay, setAutoPlayState] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dueCards, setDueCards] = useState<typeof allCards>([]);
+  const [batchLimit, setBatchLimitState] = useState<number>(20);
+  const [boxFilter, setBoxFilterState] = useState<ReviewBoxFilter>("all");
 
   useEffect(() => {
     setDueCards(getDueCards(allCards));
     setAutoPlayState(getAutoPlay());
+    setBatchLimitState(getReviewBatchLimit());
+    setBoxFilterState(getReviewBoxFilter());
     const saved = loadSessionMode(SESSION_KEY) as Mode | null;
     if (saved && REVIEW_MODES.some((m) => m.id === saved)) setMode(saved);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -100,6 +155,17 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
     setAutoPlayState(next);
     setAutoPlay(next);
   };
+
+  const pickBatchLimit = (n: number) => { setBatchLimitState(n); setReviewBatchLimit(n); };
+  const pickBoxFilter = (f: ReviewBoxFilter) => { setBoxFilterState(f); setReviewBoxFilter(f); };
+
+  // Distribution + deck sau khi filter + slice batch
+  const distribution = useMemo(() => boxDistribution(dueCards), [dueCards]);
+  const filteredDue = useMemo(() => filterByBox(dueCards, boxFilter), [dueCards, boxFilter]);
+  const deck = useMemo(
+    () => (batchLimit > 0 ? filteredDue.slice(0, batchLimit) : filteredDue),
+    [filteredDue, batchLimit]
+  );
 
   const currentMode = REVIEW_MODES.find((m) => m.id === mode);
 
@@ -121,13 +187,13 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
           <span>←</span> Trang chủ
         </Link>
 
-        <div className="mb-6">
+        <div className="mb-4">
           <p className="text-sm font-semibold uppercase tracking-widest text-shu">Ôn tập SRS</p>
           <h1 className="mt-1 font-jp text-3xl font-bold text-ink">
             Ôn tập hôm nay
           </h1>
           <p className="mt-1 text-sm text-sub">
-            {dueCards.length} từ cần ôn · Chọn chế độ để bắt đầu
+            {deck.length}/{dueCards.length} từ · Chọn chế độ để bắt đầu
           </p>
         </div>
 
@@ -144,21 +210,81 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {REVIEW_MODES.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => pickMode(m.id)}
-                className="group flex flex-col rounded-2xl border border-line bg-card p-5 text-left shadow-card transition hover:-translate-y-1 hover:border-indigo hover:shadow-lift"
-              >
-                <div className={`mb-3 flex h-12 w-12 items-center justify-center rounded-2xl ${m.iconBg}`}>
-                  {m.icon}
+          <>
+            {/* Distribution + Filters */}
+            <div className="mb-4 rounded-2xl border border-line bg-card p-4 shadow-card">
+              {/* Distribution chips */}
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-widest text-sub">Phân loại</span>
+                <span className="rounded-full bg-shu-soft px-2.5 py-0.5 text-xs font-semibold text-shu">🟥 {distribution.weak} sắp quên</span>
+                <span className="rounded-full bg-indigo-soft px-2.5 py-0.5 text-xs font-semibold text-indigo">🟨 {distribution.medium} nhớ khá</span>
+                <span className="rounded-full bg-moss/10 px-2.5 py-0.5 text-xs font-semibold text-moss">🟩 {distribution.strong} thuộc</span>
+              </div>
+
+              {/* Box filter */}
+              <div className="mb-3">
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-sub">Ôn nhóm nào</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {REVIEW_BOX_FILTERS.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => pickBoxFilter(f.id)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                        boxFilter === f.id
+                          ? "border-indigo bg-indigo text-white"
+                          : "border-line bg-card text-ink hover:border-indigo hover:text-indigo"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
                 </div>
-                <p className="font-semibold text-ink">{m.label}</p>
-                <p className="mt-1 text-xs leading-relaxed text-sub">{m.desc}</p>
-              </button>
-            ))}
-          </div>
+              </div>
+
+              {/* Batch limit */}
+              <div>
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-sub">Số từ mỗi phiên</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {REVIEW_BATCH_OPTIONS.map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => pickBatchLimit(n)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                        batchLimit === n
+                          ? "border-indigo bg-indigo text-white"
+                          : "border-line bg-card text-ink hover:border-indigo hover:text-indigo"
+                      }`}
+                    >
+                      {n === 0 ? "Tất cả" : `${n} từ`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Modes grid */}
+            {deck.length === 0 ? (
+              <div className="rounded-2xl border border-line bg-card p-6 text-center text-sm text-sub">
+                Không có từ nào trong nhóm này. Đổi filter khác.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {REVIEW_MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => pickMode(m.id)}
+                    className="group flex flex-col rounded-2xl border border-line bg-card p-5 text-left shadow-card transition hover:-translate-y-1 hover:border-indigo hover:shadow-lift"
+                  >
+                    <div className={`mb-3 flex h-12 w-12 items-center justify-center rounded-2xl ${m.iconBg}`}>
+                      {m.icon}
+                    </div>
+                    <p className="font-semibold text-ink">{m.label}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-sub">{m.desc}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
     );
@@ -221,7 +347,7 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
             )}
           </div>
 
-          <span className="hidden truncate text-sm text-sub sm:inline">· {dueCards.length} thẻ</span>
+          <span className="hidden truncate text-sm text-sub sm:inline">· {deck.length}/{dueCards.length} thẻ</span>
         </div>
 
         <button
@@ -247,20 +373,35 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-3">
-        {dueCards.length === 0 ? (
+        {deck.length === 0 ? (
           <div className="flex flex-col items-center rounded-3xl border border-line bg-card p-10 text-center shadow-card">
             <p className="text-3xl">🎉</p>
-            <p className="mt-3 font-semibold text-ink">Tất cả đã ôn rồi!</p>
-            <Link href="/" className="mt-4 rounded-full bg-indigo px-6 py-2.5 font-semibold text-white hover:bg-indigo-deep">
-              Về trang chủ
-            </Link>
+            <p className="mt-3 font-semibold text-ink">
+              {dueCards.length === 0 ? "Tất cả đã ôn rồi!" : "Nhóm này không có từ nào"}
+            </p>
+            {dueCards.length > 0 && (
+              <button
+                onClick={() => setMode(null)}
+                className="mt-4 rounded-full bg-indigo px-6 py-2.5 font-semibold text-white hover:bg-indigo-deep"
+              >
+                Đổi nhóm
+              </button>
+            )}
+            {dueCards.length === 0 && (
+              <Link href="/" className="mt-4 rounded-full bg-indigo px-6 py-2.5 font-semibold text-white hover:bg-indigo-deep">
+                Về trang chủ
+              </Link>
+            )}
           </div>
         ) : (
-          <div key={mode}>
-            {mode === "quiz"   && <QuizMode   cards={dueCards} autoPlay={autoPlay} sessionKey={SESSION_KEY} distractorPool={allCards} />}
-            {mode === "typing" && <TypingMode cards={dueCards} autoPlay={autoPlay} sessionKey={SESSION_KEY} />}
-            {mode === "listen" && <ListenMode cards={dueCards} sessionKey={SESSION_KEY} distractorPool={allCards} />}
-            {mode === "spell"  && <SpellMode  cards={dueCards} />}
+          <div key={`${mode}-${boxFilter}-${batchLimit}`}>
+            {mode === "flashcard" && <FlashcardMode cards={deck} autoPlay={autoPlay} sessionKey={SESSION_KEY} />}
+            {mode === "quiz"      && <QuizMode      cards={deck} autoPlay={autoPlay} sessionKey={SESSION_KEY} distractorPool={allCards} />}
+            {mode === "match"     && <MatchMode     cards={deck} />}
+            {mode === "typing"    && <TypingMode    cards={deck} autoPlay={autoPlay} sessionKey={SESSION_KEY} />}
+            {mode === "listen"    && <ListenMode    cards={deck} sessionKey={SESSION_KEY} distractorPool={allCards} />}
+            {mode === "spell"     && <SpellMode     cards={deck} />}
+            {mode === "fill"      && <FillMode      cards={deck} sessionKey={SESSION_KEY} />}
           </div>
         )}
       </div>

@@ -245,6 +245,71 @@ export function getDueCards(cards: Card[]): Card[] {
   });
 }
 
+// ── Review session filters (batch limit + box filter) ─────────────────────
+
+export type ReviewBoxFilter = "all" | "weak" | "medium" | "strong";
+export const REVIEW_BATCH_OPTIONS = [10, 20, 50, 0] as const; // 0 = tất cả
+export const REVIEW_BOX_FILTERS: { id: ReviewBoxFilter; label: string; short: string; cls: string }[] = [
+  { id: "all",    label: "Tất cả",     short: "Tất cả",    cls: "bg-line text-sub" },
+  { id: "weak",   label: "Sắp quên",   short: "Yếu",      cls: "bg-shu-soft text-shu" },
+  { id: "medium", label: "Nhớ khá",    short: "Vừa",      cls: "bg-indigo-soft text-indigo" },
+  { id: "strong", label: "Thuộc",      short: "Mạnh",     cls: "bg-moss/10 text-moss" },
+];
+
+/** Trả về nhóm box của card (dùng cho filter). */
+export function categorizeBox(box: number): Exclude<ReviewBoxFilter, "all"> {
+  if (box <= 2) return "weak";
+  if (box === 3) return "medium";
+  return "strong"; // box 4-5
+}
+
+/** Đếm số lượng card theo từng nhóm box. */
+export function boxDistribution(cards: Card[]): Record<Exclude<ReviewBoxFilter, "all">, number> {
+  const store = read();
+  const result = { weak: 0, medium: 0, strong: 0 };
+  for (const c of cards) {
+    const p = store[c.id];
+    if (!p || p.reps === 0) continue;
+    const box = effectiveBox(p);
+    if (box === 0) continue;
+    result[categorizeBox(box)]++;
+  }
+  return result;
+}
+
+/** Filter cards theo nhóm box đã chọn. */
+export function filterByBox(cards: Card[], filter: ReviewBoxFilter): Card[] {
+  if (filter === "all") return cards;
+  const store = read();
+  return cards.filter((c) => {
+    const p = store[c.id];
+    if (!p || p.reps === 0) return false;
+    return categorizeBox(effectiveBox(p)) === filter;
+  });
+}
+
+const REVIEW_BATCH_KEY = "minna-review-batch-v1";
+const REVIEW_FILTER_KEY = "minna-review-filter-v1";
+
+export function getReviewBatchLimit(): number {
+  if (typeof window === "undefined") return 20;
+  const v = localStorage.getItem(REVIEW_BATCH_KEY);
+  return v !== null ? Number(v) : 20;
+}
+export function setReviewBatchLimit(n: number): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(REVIEW_BATCH_KEY, String(n));
+}
+export function getReviewBoxFilter(): ReviewBoxFilter {
+  if (typeof window === "undefined") return "all";
+  const v = localStorage.getItem(REVIEW_FILTER_KEY);
+  return (v as ReviewBoxFilter) ?? "all";
+}
+export function setReviewBoxFilter(f: ReviewBoxFilter): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(REVIEW_FILTER_KEY, f);
+}
+
 // ── Streak & daily count ───────────────────────────────────────────────────
 
 const STREAK_KEY = "minna-streak-v1";
