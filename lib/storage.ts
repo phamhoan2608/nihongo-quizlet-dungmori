@@ -98,6 +98,24 @@ export function getAllProgress(): Store {
 }
 
 /**
+ * Mochi-style interval anchors (số ngày cho từng box 0-5).
+ * Grow ~2-3x per box. Ease fine-tunes ±20%.
+ * - Box 0: due ngay (again / mới)
+ * - Box 1: 1 ngày (learning)
+ * - Box 2: 3 ngày (young)
+ * - Box 3: 7 ngày (đang ôn)
+ * - Box 4: 16 ngày (thuộc)
+ * - Box 5: 60 ngày (thuộc hẳn, chỉ đạt qua markMastered)
+ */
+const BOX_DAYS: readonly number[] = [0, 1, 3, 7, 16, 60];
+
+function nextInterval(box: number, ease: number): number {
+  const base = BOX_DAYS[Math.min(Math.max(box, 0), BOX_DAYS.length - 1)] ?? 0;
+  // Ease 2.5 → base, ease cao hơn → interval dài hơn (fine-tuning ±20%)
+  return Math.max(0, Math.round(base * (ease / 2.5)));
+}
+
+/**
  * Grade a card after a study session.
  * source="flashcard" caps box at 2 (recognition only).
  * source="exercise"  caps box at 4 (active recall).
@@ -121,15 +139,20 @@ export function grade(id: number, g: Grade, source: GradeSource = "exercise"): C
     p.wrong++;
     p.box = Math.max(0, p.box - 1);
     p.ease = Math.max(1.3, p.ease - 0.2);
-    p.interval = 0;
-  } else {
+  } else if (g === "hard") {
     p.correct++;
-    p.box = Math.min(cap, p.box + (g === "easy" ? 2 : 1));
-    if (g === "hard") p.ease = Math.max(1.3, p.ease - 0.15);
-    if (g === "easy") p.ease += 0.15;
-    if (p.interval === 0) p.interval = g === "easy" ? 3 : 1;
-    else p.interval = Math.round(p.interval * p.ease * (g === "hard" ? 0.6 : 1));
+    p.ease = Math.max(1.3, p.ease - 0.15);
+    // box giữ nguyên
+  } else if (g === "good") {
+    p.correct++;
+    p.box = Math.min(cap, p.box + 1);
+  } else { // "easy"
+    p.correct++;
+    p.box = Math.min(cap, p.box + 2);
+    p.ease += 0.15;
   }
+
+  p.interval = nextInterval(p.box, p.ease);
   p.due = now + p.interval * DAY;
   store[id] = p;
   write(store);
@@ -235,41 +258,47 @@ export function clearSessionPos(key: string): void {
 
 // ── Due cards (SRS review) ─────────────────────────────────────────────────
 
-/** Return cards that are due for review (box > 0 and due <= now). */
+/**
+ * Return cards that are due for review OR are new (chưa học).
+ * Từ mới (reps=0) được đưa vào review để user học lần đầu.
+ * Từ đã học: chỉ hiện khi box > 0 và tới hạn (due <= now).
+ */
 export function getDueCards(cards: Card[]): Card[] {
   const store = read();
   const now = Date.now();
   return cards.filter((c) => {
     const p = store[c.id];
-    return p && p.reps > 0 && effectiveBox(p) > 0 && p.due <= now;
+    if (!p || p.reps === 0) return true; // từ mới chưa học
+    return effectiveBox(p) > 0 && p.due <= now; // từ đã học tới hạn
   });
 }
 
 // ── Review session filters (batch limit + box filter) ─────────────────────
 
-export type ReviewBoxFilter = "all" | "weak" | "medium" | "strong";
+export type ReviewBoxFilter = "all" | "new" | "weak" | "medium" | "strong";
 export const REVIEW_BATCH_OPTIONS = [10, 20, 50, 0] as const; // 0 = tất cả
 export const REVIEW_BOX_FILTERS: { id: ReviewBoxFilter; label: string; short: string; cls: string }[] = [
-  { id: "all",    label: "Tất cả",     short: "Tất cả",    cls: "bg-line text-sub" },
-  { id: "weak",   label: "Sắp quên",   short: "Yếu",      cls: "bg-shu-soft text-shu" },
-  { id: "medium", label: "Nhớ khá",    short: "Vừa",      cls: "bg-indigo-soft text-indigo" },
-  { id: "strong", label: "Thuộc",      short: "Mạnh",     cls: "bg-moss/10 text-moss" },
+  { id: "all",    label: "Tất cả",     short: "Tất cả",   cls: "bg-line text-sub" },
+  { id: "new",    label: "Mới",        short: "Mới",     cls: "bg-indigo/10 text-indigo" },
+  { id: "weak",   label: "Sắp quên",   short: "Yếu",     cls: "bg-shu-soft text-shu" },
+  { id: "medium", label: "Nhớ khá",    short: "Vừa",     cls: "bg-indigo-soft text-indigo" },
+  { id: "strong", label: "Thuộc",      short: "Mạnh",    cls: "bg-moss/10 text-moss" },
 ];
 
-/** Trả về nhóm box của card (dùng cho filter). */
-export function categorizeBox(box: number): Exclude<ReviewBoxFilter, "all"> {
+/** Trả về nhóm box của card đã học (không cho "new" và "all"). */
+export function categorizeBox(box: number): "weak" | "medium" | "strong" {
   if (box <= 2) return "weak";
   if (box === 3) return "medium";
   return "strong"; // box 4-5
 }
 
-/** Đếm số lượng card theo từng nhóm box. */
-export function boxDistribution(cards: Card[]): Record<Exclude<ReviewBoxFilter, "all">, number> {
+/** Đếm số lượng card theo nhóm: new (chưa học) + weak/medium/strong. */
+export function boxDistribution(cards: Card[]): Record<"new" | "weak" | "medium" | "strong", number> {
   const store = read();
-  const result = { weak: 0, medium: 0, strong: 0 };
+  const result = { new: 0, weak: 0, medium: 0, strong: 0 };
   for (const c of cards) {
     const p = store[c.id];
-    if (!p || p.reps === 0) continue;
+    if (!p || p.reps === 0) { result.new++; continue; }
     const box = effectiveBox(p);
     if (box === 0) continue;
     result[categorizeBox(box)]++;
@@ -277,10 +306,13 @@ export function boxDistribution(cards: Card[]): Record<Exclude<ReviewBoxFilter, 
   return result;
 }
 
-/** Filter cards theo nhóm box đã chọn. */
+/** Filter cards theo nhóm đã chọn. */
 export function filterByBox(cards: Card[], filter: ReviewBoxFilter): Card[] {
   if (filter === "all") return cards;
   const store = read();
+  if (filter === "new") {
+    return cards.filter((c) => !store[c.id] || store[c.id].reps === 0);
+  }
   return cards.filter((c) => {
     const p = store[c.id];
     if (!p || p.reps === 0) return false;

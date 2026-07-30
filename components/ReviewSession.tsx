@@ -216,6 +216,7 @@ export default function ReviewSession({ allCards }: { allCards: Card[] }) {
               {/* Distribution chips */}
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-widest text-sub">Phân loại</span>
+                <span className="rounded-full bg-indigo/10 px-2.5 py-0.5 text-xs font-semibold text-indigo">✨ {distribution.new} mới</span>
                 <span className="rounded-full bg-shu-soft px-2.5 py-0.5 text-xs font-semibold text-shu">🟥 {distribution.weak} sắp quên</span>
                 <span className="rounded-full bg-indigo-soft px-2.5 py-0.5 text-xs font-semibold text-indigo">🟨 {distribution.medium} nhớ khá</span>
                 <span className="rounded-full bg-moss/10 px-2.5 py-0.5 text-xs font-semibold text-moss">🟩 {distribution.strong} thuộc</span>
